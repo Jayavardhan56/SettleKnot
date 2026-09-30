@@ -1,0 +1,141 @@
+{
+  "accounts": [
+    {
+      "id": "admin-user-001",
+      "name": "System Admin ⚡",
+      "email": "settleknot@admin.in",
+      "password": "jay@settleknot56",
+      "avatar": "👑",
+      "createdAt": "2026-09-23T12:09:41.668Z",
+      "isAdmin": true
+    },
+    {
+      "id": "usr_1790244713312_jc3rz",
+      "name": "T1",
+      "email": "t1@gmail.com",
+      "password": "t1",
+      "avatar": "🐨",
+      "createdAt": "2026-09-24T10:11:53.312Z",
+      "isAdmin": false
+    },
+    {
+      "id": "usr_1790244743670_egr3n",
+      "name": "T2",
+      "email": "t2@gmail.com",
+      "password": "t2",
+      "avatar": "🐨",
+      "createdAt": "2026-09-24T10:12:23.670Z",
+      "isAdmin": false
+    }
+  ],
+  "rooms": [
+    {
+      "id": "room-1790253747443",
+      "code": "C2KTSM",
+      "name": "T1",
+      "currency": "₹",
+      "hostId": "admin-user-001",
+      "createdAt": "2026-09-24T12:42:27.443Z",
+      "joinRequests": [
+        {
+          "id": "req_1790254579188_0p7k",
+          "userId": "usr_1790244713312_jc3rz",
+          "userName": "T1",
+          "avatar": "🐨",
+          "status": "approved",
+          "createdAt": "2026-09-24T12:56:19.189Z"
+        },
+        {
+          "id": "req_1790746907974_toz3",
+          "userId": "usr_1790244743670_egr3n",
+          "userName": "T2",
+          "avatar": "🐨",
+          "status": "approved",
+          "rejectionsCount": 0,
+          "createdAt": "2026-09-30T05:41:47.974Z"
+        }
+      ],
+      "members": [
+        {
+          "id": "admin-user-001",
+          "name": "System Admin ⚡",
+          "avatar": "👑",
+          "isHost": true,
+          "status": "approved"
+        },
+        {
+          "id": "usr_1790244713312_jc3rz",
+          "name": "T1",
+          "avatar": "🐨",
+          "status": "approved"
+        },
+        {
+          "id": "usr_1790244743670_egr3n",
+          "name": "T2",
+          "avatar": "🐨",
+          "status": "approved"
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-1790746974312",
+          "timestamp": "2026-09-30T05:42:54.312Z",
+          "dateFormatted": "30 Sept 2026",
+          "timeFormatted": "11:12 am",
+          "title": "Dinner",
+          "amount": 300,
+          "category": "food",
+          "paidBy": "usr_1790244743670_egr3n",
+          "isPersonal": false,
+          "splitType": "equal",
+          "splitAmong": [
+            "admin-user-001",
+            "usr_1790244713312_jc3rz",
+            "usr_1790244743670_egr3n"
+          ],
+          "customSplits": null,
+          "notes": ""
+        },
+        {
+          "id": "exp-1790746957239",
+          "timestamp": "2026-09-30T05:42:37.239Z",
+          "dateFormatted": "30 Sept 2026",
+          "timeFormatted": "11:12 am",
+          "title": "Lunch",
+          "amount": 200,
+          "category": "food",
+          "paidBy": "usr_1790244713312_jc3rz",
+          "isPersonal": false,
+          "splitType": "equal",
+          "splitAmong": [
+            "admin-user-001",
+            "usr_1790244713312_jc3rz",
+            "usr_1790244743670_egr3n"
+          ],
+          "customSplits": null,
+          "notes": ""
+        },
+        {
+          "id": "exp-1790746938600",
+          "timestamp": "2026-09-30T05:42:18.600Z",
+          "dateFormatted": "30 Sept 2026",
+          "timeFormatted": "11:12 am",
+          "title": "Tiffin",
+          "amount": 120,
+          "category": "food",
+          "paidBy": "admin-user-001",
+          "isPersonal": false,
+          "splitType": "equal",
+          "splitAmong": [
+            "admin-user-001",
+            "usr_1790244713312_jc3rz",
+            "usr_1790244743670_egr3n"
+          ],
+          "customSplits": null,
+          "notes": ""
+        }
+      ],
+      "userRejections": {}
+    }
+  ]
+}

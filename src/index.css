@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-space: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    --bg-light: #f8fafc;
+    --card-light: #ffffff;
+    --border-light: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent-orange: #ea580c;
+    --accent-amber: #d97706;
+    --accent-warm: #f97316;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-inter);
+  }
+
+  body {
+    background-color: #f8fafc;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(234, 88, 12, 0.07) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(217, 119, 6, 0.06) 0px, transparent 50%);
+    background-attachment: fixed;
+    color: #0f172a;
+    font-family: var(--font-inter) !important;
+    min-height: 100vh;
+  }
+}
+
+/* Typography Classes */
+.font-sans {
+  font-family: var(--font-inter) !important;
+}
+
+.font-digits, .font-tech {
+  font-family: var(--font-space) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.font-mono {
+  font-family: var(--font-space), monospace !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+.text-tech-orange {
+  color: #ea580c;
+}
+
+.text-tech-gradient {
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 50%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glassmorphic Panels & Cards */
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.03);
+}
+
+.glass-panel-ultra {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(234, 88, 12, 0.2);
+  box-shadow: 0 20px 40px -15px rgba(234, 88, 12, 0.15), 0 8px 16px -4px rgba(15, 23, 42, 0.05);
+}
+
+.glass-card-light {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 5px 0 rgba(15, 23, 42, 0.04);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-light:hover {
+  border-color: rgba(234, 88, 12, 0.4);
+  box-shadow: 0 12px 28px -8px rgba(234, 88, 12, 0.18);
+  transform: translateY(-3px);
+}
+
+/* Buttons */
+.btn-tech-orange {
+  background: linear-gradient(135deg, #ea580c 0%, #d97706 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px 0 rgba(234, 88, 12, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-tech-orange:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 8px 22px 0 rgba(234, 88, 12, 0.45);
+}
+
+.btn-tech-orange:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ea580c 0%, #d97706 100%);
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 4px 14px 0 rgba(234, 88, 12, 0.3);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 4px 14px 0 rgba(5, 150, 105, 0.3);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Pulse Ring Animation */
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(234, 88, 12, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0); }
+}
+
+.animate-pulse-ring {
+  animation: pulseRing 2s infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes floatBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-floatBounce {
+  animation: floatBounce 3s ease-in-out infinite;
+}
+
+/* Light Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ea580c;
+}
