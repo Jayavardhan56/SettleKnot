@@ -270,9 +270,9 @@ export default function App() {
       )}
 
       {/* Right Column: Scrollable Main Content Pane */}
-      <div className="flex-1 flex flex-col min-w-0 h-[calc(100vh-3.5rem)] md:h-screen overflow-hidden">
-        {/* Render Navbar header ONLY when unauthenticated (Landing or Auth views) */}
-        {!currentUser && (
+      <div className={`flex-1 flex flex-col min-w-0 ${currentUser ? 'h-[calc(100vh-3.5rem)] md:h-screen' : 'h-screen'} overflow-hidden`}>
+        {/* Render Navbar header ONLY when unauthenticated and not on Landing or Auth pages */}
+        {!currentUser && effectiveRoute.view !== 'landing' && effectiveRoute.view !== 'auth' && (
           <Navbar
             room={null}
             currentUser={null}
