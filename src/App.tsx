@@ -189,7 +189,12 @@ export default function App() {
 
   const handleAddExpenseSubmit = async (expenseData: Omit<Expense, 'id' | 'timestamp' | 'dateFormatted' | 'timeFormatted'>) => {
     if (!currentRoom) return;
-    await addExpense(currentRoom.code, expenseData);
+    const finalData = {
+      ...expenseData,
+      paidBy: currentUser?.id || expenseData.paidBy || currentRoom.hostId,
+      paidByName: currentUser?.name || expenseData.paidByName || 'You',
+    };
+    await addExpense(currentRoom.code, finalData);
     syncServerRooms().then(setRooms);
     confetti({ particleCount: 50, spread: 70, origin: { y: 0.8 } });
   };

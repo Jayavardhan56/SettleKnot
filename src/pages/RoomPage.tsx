@@ -827,8 +827,19 @@ export const RoomPage: React.FC<RoomPageProps> = ({
           ) : (
             <div className="space-y-3">
               {filteredExpenses.map((exp) => {
-                const payer = room.members.find((m) => m.id === exp.paidBy);
-                const isMyPersonal = exp.isPersonal && exp.paidBy === currentUser?.id;
+                const payer = room.members.find(
+                  (m) =>
+                    m &&
+                    (m.id === exp.paidBy ||
+                      (exp.paidByName && m.name.toLowerCase() === exp.paidByName.toLowerCase()) ||
+                      m.name.toLowerCase() === exp.paidBy.toLowerCase())
+                ) || (exp.paidBy === currentUser?.id ? currentUser : null);
+
+                const isMyPersonal = exp.isPersonal && (exp.paidBy === currentUser?.id || exp.paidByName === currentUser?.name);
+                const payerDisplayName =
+                  payer?.name ||
+                  exp.paidByName ||
+                  (exp.paidBy === currentUser?.id ? currentUser?.name || 'You' : isMyPersonal ? 'You' : 'Member');
 
                 return (
                   <div
@@ -858,7 +869,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                           ) : null}
                         </div>
                         <p className="text-xs text-slate-500 font-medium mt-0.5">
-                          Paid by <strong className="text-slate-800">{payer?.name || (isMyPersonal ? 'You' : 'Unknown')}</strong> • {exp.dateFormatted || 'Today'} {exp.notes ? `• "${exp.notes}"` : ''}
+                          Paid by <strong className="text-slate-800">{payerDisplayName}</strong> • {exp.dateFormatted || 'Today'} {exp.notes ? `• "${exp.notes}"` : ''}
                         </p>
                       </div>
                     </div>

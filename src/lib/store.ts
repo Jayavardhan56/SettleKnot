@@ -564,7 +564,7 @@ export function calculateSettlements(room: Room | null): Settlement[] {
   const groupExpenses = expenses.filter((e) => e && !e.isPersonal);
 
   groupExpenses.forEach((exp) => {
-    const paidById = resolveMemberId(exp.paidBy);
+    const paidById = resolveMemberId(exp.paidBy) || (exp.paidByName ? resolveMemberId(exp.paidByName) : null);
     const amount = Number(exp.amount) || 0;
 
     if (exp.splitType === 'custom' && exp.customSplits && typeof exp.customSplits === 'object') {

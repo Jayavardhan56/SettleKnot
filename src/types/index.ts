@@ -25,6 +25,7 @@ export interface Expense {
   amount: number;
   category: ExpenseCategory | string;
   paidBy: string;
+  paidByName?: string;
   isPersonal: boolean;
   splitType: SplitType | string;
   splitAmong?: string[];

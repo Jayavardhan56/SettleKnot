@@ -99,7 +99,14 @@ export function generateTripPDF(room: Room | null): void {
     currentY += 10;
   } else {
     const groupRows = groupExpenses.map((exp) => {
-      const payer = room.members.find((m) => m && m.id === exp.paidBy);
+      const payer = room.members.find(
+        (m) =>
+          m &&
+          (m.id === exp.paidBy ||
+            (exp.paidByName && m.name.toLowerCase() === exp.paidByName.toLowerCase()) ||
+            m.name.toLowerCase() === exp.paidBy.toLowerCase())
+      );
+      const payerName = sanitizePdfText(payer?.name || exp.paidByName || 'Member');
       const splitTypeStr = exp.splitType === 'custom' ? 'Custom Amounts' : 'Equal Split';
       const catClean = sanitizePdfText(exp.category) || 'General';
       const catFormatted = catClean.charAt(0).toUpperCase() + catClean.slice(1);
@@ -107,7 +114,7 @@ export function generateTripPDF(room: Room | null): void {
       return [
         exp.dateFormatted ? `${exp.dateFormatted} ${exp.timeFormatted || ''}` : 'N/A',
         sanitizePdfText(exp.title),
-        sanitizePdfText(payer?.name || 'Unknown'),
+        payerName,
         catFormatted,
         splitTypeStr,
         `${currencySymbol}${Number(exp.amount || 0).toFixed(2)}`,
