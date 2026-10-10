@@ -501,10 +501,15 @@ app.post('/api/rooms', async (req, res) => {
   }
 
   if (action === 'deleteExpense') {
-    const { expenseId } = req.body;
+    const { expenseId, userId } = req.body;
     const targetRoom = rooms.find((r) => r.code === code);
     if (!targetRoom) return res.status(404).json({ success: false, error: 'Room not found.' });
     if (targetRoom.expenses) {
+      const expToDelete = targetRoom.expenses.find((e) => e && e.id === expenseId);
+      if (expToDelete && userId && expToDelete.paidBy && expToDelete.paidBy !== userId) {
+        logEvent('UNAUTHORIZED DELETE', `Blocked user '${userId}' from deleting expense '${expenseId}' (Owned by '${expToDelete.paidBy}')`);
+        return res.status(403).json({ success: false, error: 'Permission Denied: Only the member who logged this expense can delete it.' });
+      }
       targetRoom.expenses = targetRoom.expenses.filter((e) => e && e.id !== expenseId);
     }
     await saveRoom(targetRoom);

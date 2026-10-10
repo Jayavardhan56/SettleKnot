@@ -179,11 +179,11 @@ export async function addExpense(roomCode: string, expenseData: Omit<Expense, 'i
   return target || null;
 }
 
-export async function deleteExpense(roomCode: string, expenseId: string): Promise<Room | null> {
+export async function deleteExpense(roomCode: string, expenseId: string, userId?: string): Promise<Room | null> {
   try {
     const data = await fetchApi<{ success: boolean; rooms: Room[]; room: Room }>('/api/rooms', {
       method: 'POST',
-      body: JSON.stringify({ action: 'deleteExpense', code: roomCode, expenseId }),
+      body: JSON.stringify({ action: 'deleteExpense', code: roomCode, expenseId, userId }),
     });
     if (data.success && Array.isArray(data.rooms)) {
       saveAllRooms(data.rooms);

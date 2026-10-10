@@ -41,8 +41,19 @@ export const RoomPage: React.FC<RoomPageProps> = ({
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
+    const exp = room.expenses?.find((e) => e.id === expenseId);
+    const isPayerOfExpense =
+      exp &&
+      (exp.paidBy === currentUser?.id ||
+        (exp.paidByName && currentUser?.name && exp.paidByName.toLowerCase() === currentUser.name.toLowerCase()));
+
+    if (!isPayerOfExpense) {
+      alert('Permission Denied: Only the person who logged this expense has the option to delete it.');
+      return;
+    }
+
     if (confirm('Are you sure you want to delete this expense item?')) {
-      await deleteExpense(room.code, expenseId);
+      await deleteExpense(room.code, expenseId, currentUser?.id);
       syncServerRooms().then(setRooms);
     }
   };
@@ -879,10 +890,12 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                         ₹{exp.amount.toFixed(2)}
                       </span>
 
-                      {(exp.paidBy === currentUser?.id || isHost) && (
+                      {/* Only the person who logged that expense can have the option to delete it */}
+                      {(exp.paidBy === currentUser?.id ||
+                        (exp.paidByName && currentUser?.name && exp.paidByName.toLowerCase() === currentUser.name.toLowerCase())) && (
                         <button
                           onClick={() => handleDeleteExpense(exp.id)}
-                          title="Delete Expense Item"
+                          title="Delete Expense (Only Creator Allowed)"
                           className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-all cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
