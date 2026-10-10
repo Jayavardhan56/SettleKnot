@@ -376,7 +376,7 @@ export async function syncServerRooms(): Promise<Room[]> {
   }
 }
 
-export async function markSettlementPaid(code: string, settlementData: Settlement): Promise<Room | null> {
+export async function claimSettlementPaid(code: string, settlementData: Settlement): Promise<Room | null> {
   const newPayment: SettlementHistoryItem = {
     id: `pay_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     fromId: settlementData.fromId,
@@ -387,24 +387,145 @@ export async function markSettlementPaid(code: string, settlementData: Settlemen
     dateFormatted: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     timeFormatted: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
     timestamp: new Date().toISOString(),
-    status: 'PAID',
+    status: 'PENDING',
   };
+
+  try {
+    const data = await fetchApi<{ success: boolean; rooms: Room[]; room?: Room }>('/api/rooms', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'claimPayment', code, payment: newPayment }),
+    });
+    if (data.success && Array.isArray(data.rooms)) {
+      saveAllRooms(data.rooms);
+      return data.room || data.rooms.find((r) => r.code === code) || null;
+    }
+  } catch (err) {
+    console.warn('Backend claimPayment error:', err);
+  }
 
   const rooms = getAllRooms();
   const target = rooms.find((r) => r && r.code === code);
   if (target) {
     target.settlementHistory = target.settlementHistory || [];
+    target.settlementHistory = target.settlementHistory.filter(
+      (p) => !(p.status !== 'PAID' && p.fromId === settlementData.fromId && p.toId === settlementData.toId)
+    );
     target.settlementHistory.unshift(newPayment);
     saveAllRooms(rooms);
-
-    try {
-      await fetchApi('/api/rooms', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'update', roomData: target }),
-      });
-    } catch (err) {}
   }
   return target || null;
+}
+
+export async function approveSettlementPayment(code: string, paymentId: string): Promise<Room | null> {
+  try {
+    const data = await fetchApi<{ success: boolean; rooms: Room[]; room?: Room }>('/api/rooms', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'approvePayment', code, paymentId }),
+    });
+    if (data.success && Array.isArray(data.rooms)) {
+      saveAllRooms(data.rooms);
+      return data.room || data.rooms.find((r) => r.code === code) || null;
+    }
+  } catch (err) {
+    console.warn('Backend approvePayment error:', err);
+  }
+
+  const rooms = getAllRooms();
+  const target = rooms.find((r) => r && r.code === code);
+  if (target && target.settlementHistory) {
+    const item = target.settlementHistory.find((p) => p.id === paymentId);
+    if (item) {
+      item.status = 'PAID';
+      item.verifiedAt = new Date().toISOString();
+      saveAllRooms(rooms);
+    }
+  }
+  return target || null;
+}
+
+export async function declineSettlementPayment(code: string, paymentId: string): Promise<Room | null> {
+  try {
+    const data = await fetchApi<{ success: boolean; rooms: Room[]; room?: Room }>('/api/rooms', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'declinePayment', code, paymentId }),
+    });
+    if (data.success && Array.isArray(data.rooms)) {
+      saveAllRooms(data.rooms);
+      return data.room || data.rooms.find((r) => r.code === code) || null;
+    }
+  } catch (err) {
+    console.warn('Backend declinePayment error:', err);
+  }
+
+  const rooms = getAllRooms();
+  const target = rooms.find((r) => r && r.code === code);
+  if (target && target.settlementHistory) {
+    const item = target.settlementHistory.find((p) => p.id === paymentId);
+    if (item) {
+      item.status = 'DECLINED';
+      item.declinedAt = new Date().toISOString();
+      saveAllRooms(rooms);
+    }
+  }
+  return target || null;
+}
+
+// Helper to get pending payment claims where the current user is the receiver
+export function getPendingReceivedPayments(userId: string, userName?: string): (SettlementHistoryItem & { roomCode: string; roomName: string })[] {
+  if (!userId && !userName) return [];
+  const rooms = getAllRooms();
+  const results: (SettlementHistoryItem & { roomCode: string; roomName: string })[] = [];
+
+  rooms.forEach((room) => {
+    if (!room || !Array.isArray(room.settlementHistory)) return;
+    room.settlementHistory.forEach((p) => {
+      if (!p || p.status !== 'PENDING') return;
+      const isRecipient =
+        (userId && p.toId === userId) ||
+        (userName && p.toName && p.toName.toLowerCase() === userName.toLowerCase()) ||
+        (userId && p.toName && p.toName.toLowerCase() === userId.toLowerCase());
+      if (isRecipient) {
+        results.push({
+          ...p,
+          roomCode: room.code,
+          roomName: room.name,
+        });
+      }
+    });
+  });
+
+  return results;
+}
+
+// Helper to get payment claims sent by the current user
+export function getPendingSentPayments(userId: string, userName?: string): (SettlementHistoryItem & { roomCode: string; roomName: string })[] {
+  if (!userId && !userName) return [];
+  const rooms = getAllRooms();
+  const results: (SettlementHistoryItem & { roomCode: string; roomName: string })[] = [];
+
+  rooms.forEach((room) => {
+    if (!room || !Array.isArray(room.settlementHistory)) return;
+    room.settlementHistory.forEach((p) => {
+      if (!p) return;
+      const isSender =
+        (userId && p.fromId === userId) ||
+        (userName && p.fromName && p.fromName.toLowerCase() === userName.toLowerCase()) ||
+        (userId && p.fromName && p.fromName.toLowerCase() === userId.toLowerCase());
+      if (isSender) {
+        results.push({
+          ...p,
+          roomCode: room.code,
+          roomName: room.name,
+        });
+      }
+    });
+  });
+
+  return results;
+}
+
+export async function markSettlementPaid(code: string, settlementData: Settlement): Promise<Room | null> {
+  return claimSettlementPaid(code, settlementData);
 }
 
 // Minimum Cash Flow Settlement Algorithm

@@ -129,6 +129,12 @@ export async function registerUser(name: string, email: string, password: string
 
 export function logoutAccount(): void {
   saveStoredCurrentUser(null);
+  if (typeof window !== 'undefined') {
+    try {
+      window.history.pushState(null, '', '#/');
+    } catch (_) {}
+    window.location.replace('#/');
+  }
 }
 
 export async function syncServerAccounts(): Promise<User[]> {

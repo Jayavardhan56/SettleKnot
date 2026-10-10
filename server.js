@@ -565,6 +565,56 @@ app.post('/api/rooms', async (req, res) => {
     return res.json({ success: true, room: targetRoom, rooms: await getRooms() });
   }
 
+  if (action === 'claimPayment') {
+    const { payment } = req.body;
+    const targetRoom = rooms.find((r) => r.code === code);
+    if (!targetRoom) return res.status(404).json({ success: false, error: 'Room not found.' });
+    targetRoom.settlementHistory = targetRoom.settlementHistory || [];
+
+    // Remove any previous pending/declined claim for the exact same transaction
+    targetRoom.settlementHistory = targetRoom.settlementHistory.filter(
+      (p) => !(p.status !== 'PAID' && p.fromId === payment.fromId && p.toId === payment.toId)
+    );
+
+    targetRoom.settlementHistory.unshift({
+      ...payment,
+      status: 'PENDING',
+    });
+    await saveRoom(targetRoom);
+    logEvent('PAYMENT CLAIM', `'${payment.fromName}' marked ₹${payment.amount} paid to '${payment.toName}' (Pending Approval) in room '${code}'`);
+    return res.json({ success: true, room: targetRoom, rooms: await getRooms() });
+  }
+
+  if (action === 'approvePayment') {
+    const { paymentId } = req.body;
+    const targetRoom = rooms.find((r) => r.code === code);
+    if (!targetRoom) return res.status(404).json({ success: false, error: 'Room not found.' });
+    targetRoom.settlementHistory = targetRoom.settlementHistory || [];
+    const item = targetRoom.settlementHistory.find((p) => p.id === paymentId);
+    if (item) {
+      item.status = 'PAID';
+      item.verifiedAt = new Date().toISOString();
+      await saveRoom(targetRoom);
+      logEvent('PAYMENT APPROVED', `'${item.toName}' verified and approved ₹${item.amount} from '${item.fromName}' in room '${code}'`);
+    }
+    return res.json({ success: true, room: targetRoom, rooms: await getRooms() });
+  }
+
+  if (action === 'declinePayment') {
+    const { paymentId } = req.body;
+    const targetRoom = rooms.find((r) => r.code === code);
+    if (!targetRoom) return res.status(404).json({ success: false, error: 'Room not found.' });
+    targetRoom.settlementHistory = targetRoom.settlementHistory || [];
+    const item = targetRoom.settlementHistory.find((p) => p.id === paymentId);
+    if (item) {
+      item.status = 'DECLINED';
+      item.declinedAt = new Date().toISOString();
+      await saveRoom(targetRoom);
+      logEvent('PAYMENT DECLINED', `'${item.toName}' declined payment claim from '${item.fromName}' in room '${code}'`);
+    }
+    return res.json({ success: true, room: targetRoom, rooms: await getRooms() });
+  }
+
   return res.status(400).json({ success: false, error: 'Invalid room action.' });
 });
 

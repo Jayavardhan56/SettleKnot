@@ -103,6 +103,20 @@ export default function App() {
     };
   }, [currentUser]);
 
+  const PROTECTED_VIEWS = ['dashboard', 'room', 'notifications', 'admin'];
+
+  // Route guard: Prevent accessing protected routes without active session (e.g. back button after logout)
+  useEffect(() => {
+    const currentRoute = getRouteFromHash();
+    if (!currentUser && PROTECTED_VIEWS.includes(currentRoute.view)) {
+      try {
+        window.history.replaceState(null, '', '#/');
+      } catch (_) {}
+      window.location.replace('#/');
+      setRoute({ view: 'landing', param: null });
+    }
+  }, [currentUser]);
+
   // Real-time server auto-polling & route changes sync
   useEffect(() => {
     // Initial fetch on mount / user change
@@ -122,19 +136,34 @@ export default function App() {
       syncServerAccounts();
     }, 3000);
 
-    const handleHashChange = () => {
+    const handleRouteNavigation = () => {
       const currentRoute = getRouteFromHash();
+      const storedUser = getStoredCurrentUser();
+
+      // Back-button Session Guard: Redirect to landing immediately if logged out
+      if (!storedUser && PROTECTED_VIEWS.includes(currentRoute.view)) {
+        try {
+          window.history.replaceState(null, '', '#/');
+        } catch (_) {}
+        window.location.replace('#/');
+        setRoute({ view: 'landing', param: null });
+        return;
+      }
+
       setRoute(currentRoute);
 
-      if (currentRoute.view === 'admin' && !currentUser?.isAdmin) {
-        navigateTo('dashboard');
+      if (currentRoute.view === 'admin' && !storedUser?.isAdmin) {
+        window.location.replace('#/dashboard');
+        setRoute({ view: 'dashboard', param: null });
       }
     };
 
-    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleRouteNavigation);
+    window.addEventListener('popstate', handleRouteNavigation);
     return () => {
       clearInterval(syncInterval);
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('hashchange', handleRouteNavigation);
+      window.removeEventListener('popstate', handleRouteNavigation);
     };
   }, [currentUser]);
 
@@ -144,7 +173,12 @@ export default function App() {
     await syncServerAccounts();
   };
 
-  const activeCode = route.param || getActiveRoomCode();
+  // Strict Session Security: Never allow rendering protected views when currentUser is null
+  const effectiveRoute = !currentUser && PROTECTED_VIEWS.includes(route.view)
+    ? { view: 'landing' as const, param: null }
+    : route;
+
+  const activeCode = effectiveRoute.param || getActiveRoomCode();
   const currentRoom = rooms.find((r) => r.code === activeCode) || null;
 
   const handleRoomSwitched = (code: string) => {
@@ -216,8 +250,13 @@ export default function App() {
           rooms={rooms}
           route={route}
           onUserLoggedOut={() => {
+            logoutAccount();
             setCurrentUser(null);
-            navigateTo('landing');
+            setRoute({ view: 'landing', param: null });
+            try {
+              window.history.replaceState(null, '', '#/');
+            } catch (_) {}
+            window.location.replace('#/');
           }}
           onOpenAdminPanel={() => {
             navigateTo('admin');
@@ -233,7 +272,7 @@ export default function App() {
       {/* Right Column: Scrollable Main Content Pane */}
       <div className="flex-1 flex flex-col min-w-0 h-[calc(100vh-3.5rem)] md:h-screen overflow-hidden">
         {/* Render Navbar header ONLY when unauthenticated (Landing or Auth views) */}
-        {!currentUser && route.view !== 'landing' && route.view !== 'auth' && (
+        {!currentUser && (
           <Navbar
             room={null}
             currentUser={null}
@@ -246,14 +285,14 @@ export default function App() {
 
         {/* Scrollable Main View Router */}
         <main className="flex-1 overflow-y-auto min-w-0">
-          {route.view === 'landing' && (
+          {effectiveRoute.view === 'landing' && (
             <LandingPage
               currentUser={currentUser}
               onOpenAuthModal={(tab) => navigateTo('auth', tab)}
             />
           )}
 
-          {route.view === 'dashboard' && (
+          {effectiveRoute.view === 'dashboard' && (
             <DashboardPage
               currentUser={currentUser}
               setRooms={setRooms}
@@ -268,21 +307,21 @@ export default function App() {
             />
           )}
 
-          {route.view === 'admin' && (
+          {effectiveRoute.view === 'admin' && (
             <AdminPage
               currentUser={currentUser}
               setRooms={setRooms}
             />
           )}
 
-          {route.view === 'notifications' && (
+          {effectiveRoute.view === 'notifications' && (
             <NotificationsPage
               currentUser={currentUser}
               setRooms={setRooms}
             />
           )}
 
-          {route.view === 'room' && (
+          {effectiveRoute.view === 'room' && (
             <div className="max-w-6xl mx-auto p-4 sm:p-6">
               {currentRoom ? (
                 <RoomPage

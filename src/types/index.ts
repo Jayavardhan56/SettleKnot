@@ -75,7 +75,9 @@ export interface SettlementHistoryItem {
   dateFormatted?: string;
   timeFormatted?: string;
   timestamp?: string;
-  status: string;
+  status: 'PENDING' | 'PAID' | 'DECLINED' | string;
+  verifiedAt?: string;
+  declinedAt?: string;
 }
 
 export interface Room {

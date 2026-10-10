@@ -1,7 +1,7 @@
 import React from 'react';
 import { navigateTo } from '../lib/router';
 import { logoutAccount } from '../lib/auth';
-import { getUserSentJoinRequests, getHostPendingJoinRequests } from '../lib/store';
+import { getUserSentJoinRequests, getHostPendingJoinRequests, getPendingReceivedPayments } from '../lib/store';
 import { Home, Bell, LogOut, ShieldCheck, ChevronRight, ChevronLeft, Sparkles, X } from 'lucide-react';
 import { User, Room, RouteState } from '../types';
 
@@ -33,12 +33,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const sentRequests = getUserSentJoinRequests(currentUser.id);
   const hostPendingRequests = getHostPendingJoinRequests(currentUser.id);
-  const totalNotifications = sentRequests.length + hostPendingRequests.length;
+  const pendingPayments = getPendingReceivedPayments(currentUser.id, currentUser.name);
+  const totalNotifications = sentRequests.length + hostPendingRequests.length + pendingPayments.length;
 
   const handleLogout = () => {
     logoutAccount();
     if (onUserLoggedOut) onUserLoggedOut();
-    navigateTo('landing');
+    window.location.replace('#/');
   };
 
   return (
