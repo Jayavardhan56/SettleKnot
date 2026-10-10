@@ -102,34 +102,34 @@ export const RoomPage: React.FC<RoomPageProps> = ({
     if (claim && claim.status === 'PENDING') {
       if (isReceiver) {
         return (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-              <span>Claimed Paid</span>
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 sm:gap-1.5 justify-end">
+            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1 whitespace-nowrap">
+              <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+              <span>Claimed</span>
             </span>
             <button
               onClick={() => handleApprovePayment(claim.id, s.fromName, s.amount)}
-              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-tech font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+              className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-tech font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all whitespace-nowrap"
               title="Confirm that you received this payment"
             >
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-3 h-3" />
               <span>Approve ✓</span>
             </button>
             <button
               onClick={() => handleDeclinePayment(claim.id, s.fromName, s.amount)}
-              className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-tech font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all"
+              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 border border-rose-300 font-tech font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all whitespace-nowrap"
               title="Decline if payment was not received"
             >
-              <X className="w-3.5 h-3.5 text-rose-600" />
+              <X className="w-3 h-3 text-rose-600" />
               <span>Decline ✕</span>
             </button>
           </div>
         );
       } else {
         return (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-tech font-bold shrink-0">
-            <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
-            <span>Pending Receiver Approval ⏳</span>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[10px] sm:text-[11px] font-tech font-bold whitespace-nowrap">
+            <Clock className="w-3 h-3 text-amber-600 animate-spin" />
+            <span>Pending Approval ⏳</span>
           </div>
         );
       }
@@ -138,35 +138,48 @@ export const RoomPage: React.FC<RoomPageProps> = ({
     if (claim && claim.status === 'DECLINED') {
       if (isPayer) {
         return (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[11px] font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 flex items-center gap-1">
-              <X className="w-3.5 h-3.5 text-rose-600" />
-              <span>Declined by {s.toName}</span>
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 sm:gap-1.5 justify-end">
+            <span className="text-[10px] font-bold text-rose-800 bg-rose-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-rose-200 flex items-center gap-1 whitespace-nowrap">
+              <X className="w-3 h-3 text-rose-600" />
+              <span>Declined</span>
             </span>
             <button
               onClick={() => handleClaimPaid(s)}
-              className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-tech font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+              className="px-2 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-tech font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all whitespace-nowrap"
               title="Pay again and request verification"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="w-3 h-3" />
               <span>Pay Again 🔄</span>
             </button>
           </div>
         );
       } else {
         return (
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-tech font-bold shrink-0">
-            <X className="w-3.5 h-3.5 text-rose-600" />
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[10px] sm:text-[11px] font-tech font-bold whitespace-nowrap">
+            <X className="w-3 h-3 text-rose-600" />
             <span>Declined (Unsettled)</span>
           </div>
         );
       }
     }
 
+    if (isReceiver) {
+      return (
+        <button
+          onClick={() => handleClaimPaid(s)}
+          className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 font-tech font-bold text-[11px] flex items-center gap-1 border border-slate-200 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+          title="Mark received if collected directly in cash"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>Received Cash</span>
+        </button>
+      );
+    }
+
     return (
       <button
         onClick={() => handleClaimPaid(s)}
-        className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-tech font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all shrink-0"
+        className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-tech font-bold text-[11px] sm:text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all whitespace-nowrap"
         title="Mark as paid and notify receiver for confirmation"
       >
         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -548,16 +561,23 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                 ) : (
                   <div className="space-y-2">
                     {receiveList.map((s, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-white border border-emerald-200 flex items-center justify-between gap-2 shadow-2xs">
-                        <div className="flex items-center gap-2">
+                      <div
+                        key={idx}
+                        className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs"
+                      >
+                        <div className="flex items-center justify-between sm:justify-start gap-2">
                           <span className="font-tech font-bold text-xs text-slate-900">{s.fromName}</span>
-                          <span className="text-[10px] text-emerald-700 font-medium">must pay you</span>
+                          <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                            must pay you
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-digits font-black text-sm text-emerald-600">
+                        <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1.5 sm:pt-0 border-t sm:border-0 border-emerald-100/60">
+                          <span className="font-digits font-black text-sm text-emerald-600 shrink-0">
                             ₹{s.amount.toFixed(2)}
                           </span>
-                          {renderSettlementAction(s)}
+                          <div className="flex items-center justify-end">
+                            {renderSettlementAction(s)}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -583,16 +603,23 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                 ) : (
                   <div className="space-y-2">
                     {payList.map((s, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-white border border-rose-200 flex items-center justify-between gap-2 shadow-2xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-rose-700 font-medium">You must pay</span>
+                      <div
+                        key={idx}
+                        className="p-3 sm:p-3.5 rounded-2xl bg-white border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs"
+                      >
+                        <div className="flex items-center justify-between sm:justify-start gap-2">
+                          <span className="text-[10px] text-rose-700 font-medium bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
+                            You must pay
+                          </span>
                           <span className="font-tech font-bold text-xs text-slate-900">{s.toName}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-digits font-black text-sm text-rose-600">
+                        <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1.5 sm:pt-0 border-t sm:border-0 border-rose-100/60">
+                          <span className="font-digits font-black text-sm text-rose-600 shrink-0">
                             ₹{s.amount.toFixed(2)}
                           </span>
-                          {renderSettlementAction(s)}
+                          <div className="flex items-center justify-end">
+                            {renderSettlementAction(s)}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -638,12 +665,14 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                       <span className="font-bold text-slate-900">{s.toName}</span>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-0 border-slate-200 pt-2 sm:pt-0">
-                      <span className="font-digits text-lg font-black text-emerald-600">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-0 border-slate-200 pt-2 sm:pt-0">
+                      <span className="font-digits text-base sm:text-lg font-black text-emerald-600 shrink-0">
                         ₹{s.amount.toFixed(2)}
                       </span>
 
-                      {renderSettlementAction(s)}
+                      <div className="flex items-center justify-end">
+                        {renderSettlementAction(s)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -679,7 +708,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                   return (
                     <div
                       key={p.id}
-                      className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs transition-all ${
+                      className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs transition-all ${
                         status === 'PENDING'
                           ? 'bg-amber-50/70 border-amber-300 shadow-2xs'
                           : status === 'DECLINED'
@@ -687,23 +716,23 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                           : 'bg-emerald-50/40 border-emerald-100'
                       }`}
                     >
-                      <div className="flex flex-wrap items-center gap-2 font-sans">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 font-sans w-full sm:w-auto">
                         {status === 'PAID' && (
-                          <span className="text-emerald-700 font-bold bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300 text-[10px] flex items-center gap-1">
+                          <span className="text-emerald-700 font-bold bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300 text-[10px] flex items-center gap-1 shrink-0">
                             <Check className="w-3 h-3 text-emerald-600" />
                             <span>✓ PAID</span>
                           </span>
                         )}
 
                         {status === 'PENDING' && (
-                          <span className="text-amber-800 font-bold bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-300 text-[10px] flex items-center gap-1 animate-pulse">
+                          <span className="text-amber-800 font-bold bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-300 text-[10px] flex items-center gap-1 animate-pulse shrink-0">
                             <Clock className="w-3 h-3 text-amber-600" />
                             <span>⏳ PENDING</span>
                           </span>
                         )}
 
                         {status === 'DECLINED' && (
-                          <span className="text-rose-700 font-bold bg-rose-100/80 px-2 py-0.5 rounded-md border border-rose-300 text-[10px] flex items-center gap-1">
+                          <span className="text-rose-700 font-bold bg-rose-100/80 px-2 py-0.5 rounded-md border border-rose-300 text-[10px] flex items-center gap-1 shrink-0">
                             <X className="w-3 h-3 text-rose-600" />
                             <span>✕ DECLINED</span>
                           </span>
@@ -712,40 +741,40 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                         <span className="font-bold text-slate-900">{p.fromName}</span>
                         <span className="text-slate-400 font-medium">paid</span>
                         <span className="font-bold text-slate-900">{p.toName}</span>
-                        <span className="text-slate-400 font-medium">• {p.dateFormatted} {p.timeFormatted}</span>
+                        <span className="text-slate-400 font-medium whitespace-nowrap">• {p.dateFormatted}</span>
 
                         {status === 'PENDING' && (
-                          <span className="text-[11px] text-amber-700 font-medium italic">
+                          <span className="text-[10px] sm:text-[11px] text-amber-700 font-medium italic">
                             ({isReceiver ? 'Awaiting your approval' : `Waiting for ${p.toName} to approve`})
                           </span>
                         )}
 
                         {status === 'DECLINED' && (
-                          <span className="text-[11px] text-rose-600 font-medium italic">
+                          <span className="text-[10px] sm:text-[11px] text-rose-600 font-medium italic">
                             (Declined by receiver)
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        <span className={`font-digits font-black text-sm ${
+                      <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-slate-200/60">
+                        <span className={`font-digits font-black text-sm shrink-0 ${
                           status === 'PAID' ? 'text-emerald-600' : status === 'PENDING' ? 'text-amber-700' : 'text-slate-500 line-through'
                         }`}>
                           ₹{p.amount.toFixed(2)}
                         </span>
 
                         {status === 'PENDING' && isReceiver && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               onClick={() => handleApprovePayment(p.id, p.fromName, p.amount)}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-tech font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+                              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-tech font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all whitespace-nowrap"
                             >
                               <Check className="w-3 h-3" />
                               <span>Approve</span>
                             </button>
                             <button
                               onClick={() => handleDeclinePayment(p.id, p.fromName, p.amount)}
-                              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-tech font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all"
+                              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 border border-rose-300 font-tech font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all whitespace-nowrap"
                             >
                               <X className="w-3 h-3 text-rose-600" />
                               <span>Decline</span>
@@ -762,7 +791,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                               toName: p.toName,
                               amount: p.amount,
                             })}
-                            className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-tech font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+                            className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-tech font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all whitespace-nowrap"
                           >
                             <RefreshCw className="w-3 h-3" />
                             <span>Pay Again</span>

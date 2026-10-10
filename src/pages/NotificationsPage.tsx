@@ -233,7 +233,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-amber-200/60 flex items-center justify-between gap-2">
+                    <div className="pt-3 border-t border-amber-200/60 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
                       <button
                         onClick={() => {
                           setActiveRoomCode(item.roomCode);
@@ -245,10 +245,10 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
                         <button
                           onClick={() => handleDeclinePayment(item.roomCode, item.id, item.fromName, item.amount)}
-                          className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-tech font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
+                          className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 border border-rose-300 font-tech font-bold text-xs flex items-center gap-1 cursor-pointer transition-all whitespace-nowrap"
                         >
                           <X className="w-3.5 h-3.5 text-rose-600" />
                           <span>Decline ✕</span>
@@ -256,7 +256,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
 
                         <button
                           onClick={() => handleApprovePayment(item.roomCode, item.id, item.fromName, item.amount)}
-                          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-tech font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-tech font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all whitespace-nowrap"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>Approve ✓</span>
