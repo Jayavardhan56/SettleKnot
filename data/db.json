@@ -135,7 +135,35 @@
           "notes": ""
         }
       ],
-      "userRejections": {}
+      "userRejections": {},
+      "settlementHistory": [
+        {
+          "id": "pay_1791627377975_c5qh",
+          "fromId": "usr_1790244713312_jc3rz",
+          "fromName": "T1",
+          "toId": "usr_1790244743670_egr3n",
+          "toName": "T2",
+          "amount": 6.66,
+          "dateFormatted": "10 Oct 2026",
+          "timeFormatted": "03:46 pm",
+          "timestamp": "2026-10-10T10:16:17.976Z",
+          "status": "PAID",
+          "verifiedAt": "2026-10-10T10:16:20.925Z"
+        },
+        {
+          "id": "pay_1791627366896_kyvy",
+          "fromId": "admin-user-001",
+          "fromName": "System Admin ⚡",
+          "toId": "usr_1790244743670_egr3n",
+          "toName": "T2",
+          "amount": 86.67,
+          "dateFormatted": "10 Oct 2026",
+          "timeFormatted": "03:46 pm",
+          "timestamp": "2026-10-10T10:16:06.897Z",
+          "status": "PAID",
+          "verifiedAt": "2026-10-10T10:16:15.122Z"
+        }
+      ]
     }
   ]
 }
