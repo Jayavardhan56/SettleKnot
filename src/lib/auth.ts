@@ -8,16 +8,19 @@ const LAST_ACTIVITY_KEY = 'settleknot_last_activity';
 
 export function updateLastActivity(): void {
   if (typeof window === 'undefined') return;
-  sessionStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+  const now = Date.now().toString();
+  localStorage.setItem(LAST_ACTIVITY_KEY, now);
+  sessionStorage.setItem(LAST_ACTIVITY_KEY, now);
 }
 
 export function getLastActivity(): number {
   if (typeof window === 'undefined') return Date.now();
-  const stored = sessionStorage.getItem(LAST_ACTIVITY_KEY);
+  const stored = localStorage.getItem(LAST_ACTIVITY_KEY) || sessionStorage.getItem(LAST_ACTIVITY_KEY);
   return stored ? parseInt(stored, 10) : Date.now();
 }
 
-export function checkSessionExpired(maxIdleMs: number = 15 * 60 * 1000): boolean {
+// Mobile and PWA persistent sessions (30-day default inactivity limit)
+export function checkSessionExpired(maxIdleMs: number = 30 * 24 * 60 * 60 * 1000): boolean {
   if (typeof window === 'undefined') return false;
   const currentUser = getStoredCurrentUser();
   if (!currentUser) return false;
@@ -43,7 +46,7 @@ export function saveStoredAccounts(accounts: User[]): void {
 
 export function getStoredCurrentUser(): User | null {
   if (typeof window === 'undefined') return null;
-  const stored = sessionStorage.getItem(AUTH_USER_KEY);
+  const stored = localStorage.getItem(AUTH_USER_KEY) || sessionStorage.getItem(AUTH_USER_KEY);
   if (!stored) return null;
   try {
     return JSON.parse(stored);
@@ -55,9 +58,12 @@ export function getStoredCurrentUser(): User | null {
 export function saveStoredCurrentUser(user: User | null): void {
   if (typeof window === 'undefined') return;
   if (!user) {
+    localStorage.removeItem(AUTH_USER_KEY);
     sessionStorage.removeItem(AUTH_USER_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
     sessionStorage.removeItem(LAST_ACTIVITY_KEY);
   } else {
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
     updateLastActivity();
   }

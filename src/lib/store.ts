@@ -22,11 +22,12 @@ export function saveAllRooms(rooms: Room[]): void {
 
 export function getActiveRoomCode(): string {
   if (typeof window === 'undefined') return 'GOA2026';
-  return sessionStorage.getItem(ACTIVE_ROOM_KEY) || 'GOA2026';
+  return localStorage.getItem(ACTIVE_ROOM_KEY) || sessionStorage.getItem(ACTIVE_ROOM_KEY) || 'GOA2026';
 }
 
 export function setActiveRoomCode(code: string): void {
   if (typeof window === 'undefined') return;
+  localStorage.setItem(ACTIVE_ROOM_KEY, code);
   sessionStorage.setItem(ACTIVE_ROOM_KEY, code);
 }
 

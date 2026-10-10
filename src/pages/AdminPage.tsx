@@ -17,10 +17,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ currentUser, setRooms }) =
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('spend');
   const [loading, setLoading] = useState(false);
+  const [dbEngine, setDbEngine] = useState<string>('Detecting...');
 
   const refreshAdminData = async () => {
     setLoading(true);
     try {
+      fetch('/api/health')
+        .then((r) => r.json())
+        .then((data) => setDbEngine(data.database || 'Local JSON'))
+        .catch(() => setDbEngine('Local Cache'));
+
       const serverRooms = await syncServerRooms();
       const serverAccounts = await syncServerAccounts();
       setRoomsList(serverRooms);
@@ -160,6 +166,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ currentUser, setRooms }) =
               </h1>
               <span className="text-[10px] uppercase bg-white text-orange-950 font-tech font-black px-2.5 py-0.5 rounded-full shadow-xs shrink-0">
                 Full Access 👑
+              </span>
+              <span className={`text-[10px] font-tech font-bold px-2.5 py-0.5 rounded-full border shadow-xs shrink-0 flex items-center gap-1 ${
+                dbEngine.includes('Supabase') ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white/20 text-white border-white/30'
+              }`}>
+                <span>{dbEngine.includes('Supabase') ? '⚡' : '📁'}</span>
+                <span>{dbEngine}</span>
               </span>
             </div>
             <p className="text-xs text-orange-100 font-medium mt-1 truncate">

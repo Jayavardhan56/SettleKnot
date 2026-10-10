@@ -60,12 +60,12 @@ export default function App() {
     setShowPwaBanner(false);
   };
 
-  // Idle Activity Tracker & Auto Logout System (15-Minute Inactivity limit)
+  // Idle Activity Tracker & Auto Logout System (30-Day Mobile / Persistent Session)
   useEffect(() => {
-    if (currentUser && checkSessionExpired(15 * 60 * 1000)) {
+    if (currentUser && checkSessionExpired(30 * 24 * 60 * 60 * 1000)) {
       logoutAccount();
       setCurrentUser(null);
-      setAutoLogoutNotice('Auto-logged out due to 15 minutes of inactivity for security.');
+      setAutoLogoutNotice('Session expired after 30 days of inactivity.');
       navigateTo('landing');
     } else if (currentUser) {
       updateLastActivity();
@@ -85,17 +85,17 @@ export default function App() {
 
     const interval = setInterval(() => {
       const storedUser = getStoredCurrentUser();
-      if (storedUser && checkSessionExpired(15 * 60 * 1000)) {
+      if (storedUser && checkSessionExpired(30 * 24 * 60 * 60 * 1000)) {
         logoutAccount();
         setCurrentUser(null);
         setIsExpenseModalOpen(false);
         setIsAuthModalOpen(false);
         setIsQrModalOpen(false);
         setIsRequestsModalOpen(false);
-        setAutoLogoutNotice('Auto-logged out after 15 minutes of inactivity for security.');
+        setAutoLogoutNotice('Session expired after 30 days of inactivity.');
         navigateTo('landing');
       }
-    }, 10000);
+    }, 60000);
 
     return () => {
       events.forEach((evt) => window.removeEventListener(evt, handleUserActivity));
