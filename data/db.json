@@ -44,6 +44,26 @@
       "avatar": "🦁",
       "createdAt": "2026-10-10T12:00:00.000Z",
       "isAdmin": false
+    },
+    {
+      "id": "usr_1792561723211_mbdef",
+      "name": "Test Traveler",
+      "email": "traveler@gmail.com",
+      "password": "BrandNewPassword2026!",
+      "avatar": "🐲",
+      "createdAt": "2026-10-21T05:48:43.211Z",
+      "isAdmin": false
+    },
+    {
+      "id": "usr_g_1792561734463_jrdra",
+      "name": "Jayavardhan Google",
+      "email": "jayavardhan.google@gmail.com",
+      "password": "g_oauth_so97w5oz",
+      "avatar": "🌟",
+      "isGoogleAuth": true,
+      "googleId": "g_123456789",
+      "createdAt": "2026-10-21T05:48:54.463Z",
+      "isAdmin": false
     }
   ],
   "rooms": [
@@ -88,7 +108,11 @@
           "paidByName": "Alex Johnson (You)",
           "isPersonal": false,
           "splitType": "equal",
-          "splitAmong": ["usr_guide_demo", "usr_member_sam", "usr_member_priya"],
+          "splitAmong": [
+            "usr_guide_demo",
+            "usr_member_sam",
+            "usr_member_priya"
+          ],
           "notes": "Booked on MakeMyTrip",
           "dateFormatted": "10 Oct 2026",
           "timeFormatted": "02:30 PM",
@@ -103,7 +127,11 @@
           "paidByName": "Sam Rivera",
           "isPersonal": false,
           "splitType": "equal",
-          "splitAmong": ["usr_guide_demo", "usr_member_sam", "usr_member_priya"],
+          "splitAmong": [
+            "usr_guide_demo",
+            "usr_member_sam",
+            "usr_member_priya"
+          ],
           "notes": "Dinner with drinks",
           "dateFormatted": "10 Oct 2026",
           "timeFormatted": "08:45 PM",
@@ -118,7 +146,11 @@
           "paidByName": "Priya Sharma",
           "isPersonal": false,
           "splitType": "equal",
-          "splitAmong": ["usr_guide_demo", "usr_member_sam", "usr_member_priya"],
+          "splitAmong": [
+            "usr_guide_demo",
+            "usr_member_sam",
+            "usr_member_priya"
+          ],
           "notes": "Mandovi River Cruise",
           "dateFormatted": "11 Oct 2026",
           "timeFormatted": "05:00 PM",

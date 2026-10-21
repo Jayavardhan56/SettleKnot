@@ -4,6 +4,8 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,6 +25,127 @@ app.use(express.json({ limit: '10mb' }));
 function logEvent(tag, message, meta = '') {
   const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   console.log(`\x1b[36m[${time}]\x1b[0m \x1b[33m[${tag}]\x1b[0m ${message}`, meta ? meta : '');
+}
+
+// Mailer Helper for Password Reset Emails
+async function sendResetPasswordEmail(recipientEmail, recipientName, resetLink) {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
+  const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASS || process.env.GMAIL_PASSWORD;
+
+  let transporter = null;
+  let fromAddress = process.env.SMTP_FROM || (smtpUser ? `"SettleKnot Support" <${smtpUser}>` : '"SettleKnot App" <no-reply@settleknot.com>');
+  let emailSent = false;
+  let previewUrl = null;
+
+  try {
+    if (smtpHost && smtpUser && smtpPass) {
+      transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    } else if (smtpUser && smtpPass) {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    } else {
+      // Create ethereal test account for dev preview
+      try {
+        const testAccount = await nodemailer.createTestAccount();
+        transporter = nodemailer.createTransport({
+          host: 'smtp.ethereal.email',
+          port: 587,
+          secure: false,
+          auth: {
+            user: testAccount.user,
+            pass: testAccount.pass,
+          },
+        });
+        fromAddress = `"SettleKnot Support" <${testAccount.user}>`;
+      } catch (e) {
+        logEvent('MAIL WARN', 'Ethereal creation skipped, using console logging fallback.');
+      }
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #0f172a; }
+          .card { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 24px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); }
+          .header { background: linear-gradient(135deg, #ea580c 0%, #f97316 50%, #d97706 100%); padding: 32px 24px; text-align: center; color: #ffffff; }
+          .logo { font-size: 38px; margin-bottom: 6px; }
+          .title { font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
+          .subtitle { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+          .content { padding: 32px 28px; }
+          .greeting { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+          .text { font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 24px; }
+          .btn-container { text-align: center; margin: 28px 0; }
+          .btn { display: inline-block; background: linear-gradient(135deg, #ea580c 0%, #d97706 100%); color: #ffffff !important; padding: 14px 32px; border-radius: 14px; text-decoration: none; font-weight: 700; font-size: 14px; box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35); }
+          .link-box { font-size: 11px; color: #64748b; word-break: break-all; background: #f8fafc; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 16px; }
+          .footer { padding: 20px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 11px; text-align: center; color: #94a3b8; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="header">
+            <div class="logo">⚡</div>
+            <h1 class="title">Reset Your Password</h1>
+            <div class="subtitle">SettleKnot Group Trip Expense Platform</div>
+          </div>
+          <div class="content">
+            <p class="greeting">Hi ${recipientName || 'Traveler'},</p>
+            <p class="text">We received a request to reset the password for your SettleKnot account (<strong>${recipientEmail}</strong>). Click the secure link below to set a new password:</p>
+            <div class="btn-container">
+              <a href="${resetLink}" class="btn" target="_blank">Set New Password 🔒</a>
+            </div>
+            <p class="text" style="font-size: 12px; margin-bottom: 6px;">Or paste this link into your browser:</p>
+            <div class="link-box">${resetLink}</div>
+            <p class="text" style="font-size: 12px; color: #94a3b8; margin-top: 24px;">This link is valid for 1 hour. If you didn't request a password reset, you can safely ignore this email.</p>
+          </div>
+          <div class="footer">
+            © 2026 SettleKnot • Group Trip Expenses & Smart Settlement
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    if (transporter) {
+      const info = await transporter.sendMail({
+        from: fromAddress,
+        to: recipientEmail,
+        subject: '🔒 Reset Your SettleKnot Password',
+        text: `Reset your SettleKnot password by clicking this link: ${resetLink} (Link expires in 1 hour)`,
+        html: htmlContent,
+      });
+      emailSent = true;
+      previewUrl = nodemailer.getTestMessageUrl(info) || null;
+      logEvent('MAIL SENT', `Password reset email dispatched to ${recipientEmail}`);
+      if (previewUrl) {
+        logEvent('MAIL PREVIEW', `Ethereal Email Preview: ${previewUrl}`);
+      }
+    }
+  } catch (err) {
+    logEvent('MAIL ERROR', `Could not dispatch email: ${err.message}`);
+  }
+
+  // Clear display in server console
+  console.log('\n\x1b[43m\x1b[30m ===================== PASSWORD RESET LINK ===================== \x1b[0m');
+  console.log(`\x1b[33mRecipient:\x1b[0m  ${recipientEmail}`);
+  console.log(`\x1b[32mReset URL:\x1b[0m  ${resetLink}`);
+  if (previewUrl) {
+    console.log(`\x1b[36mPreview URL:\x1b[0m ${previewUrl}`);
+  }
+  console.log('\x1b[43m\x1b[30m =============================================================== \x1b[0m\n');
+
+  return { emailSent, previewUrl, resetLink };
 }
 
 // Request Logger Middleware
@@ -365,6 +488,128 @@ app.post('/api/auth', async (req, res) => {
     return res.json({ success: true, accounts: updatedAccounts, rooms: updatedRooms });
   }
 
+  if (action === 'google-auth') {
+    const { name: gName, email: gEmail, avatar: gAvatar, googleId } = req.body;
+    if (!gEmail) {
+      return res.status(400).json({ success: false, error: 'Google account email is required.' });
+    }
+    const cleanEmail = gEmail.trim().toLowerCase();
+    let account = accounts.find((a) => a.email && a.email.toLowerCase() === cleanEmail);
+
+    if (account) {
+      if (gAvatar && !account.avatar) {
+        account.avatar = gAvatar;
+        await saveAccount(account);
+      }
+      const token = `sk_tok_${account.id}_${Date.now()}`;
+      logEvent('AUTH GOOGLE', `Existing user signed in with Google: '${account.name}' (${account.email})`);
+      return res.json({ success: true, account, token });
+    }
+
+    // New Google user registration
+    const avatars = ['🦊', '🐼', '🦁', '🐻', '🐯', '🐨', '🦄', '🐲', '🐙'];
+    const chosenAvatar = gAvatar || avatars[Math.floor(Math.random() * avatars.length)];
+    const chosenName = (gName || cleanEmail.split('@')[0] || 'Traveler').trim();
+
+    const newAccount = {
+      id: `usr_g_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      name: chosenName,
+      email: cleanEmail,
+      password: `g_oauth_${Math.random().toString(36).substr(2, 8)}`,
+      avatar: chosenAvatar,
+      isGoogleAuth: true,
+      googleId: googleId || '',
+      createdAt: new Date().toISOString(),
+      isAdmin: cleanEmail === 'settleknot@admin.in',
+    };
+
+    await saveAccount(newAccount);
+    const token = `sk_tok_${newAccount.id}_${Date.now()}`;
+    logEvent('AUTH GOOGLE', `New Google account created: '${newAccount.name}' (${newAccount.email})`);
+    return res.json({ success: true, account: newAccount, token });
+  }
+
+  if (action === 'forgot-password') {
+    const { email: reqEmail, origin: reqOrigin } = req.body;
+    if (!reqEmail) {
+      return res.status(400).json({ success: false, error: 'Email address is required.' });
+    }
+    const cleanEmail = reqEmail.trim().toLowerCase();
+    const account = accounts.find((a) => a.email && a.email.toLowerCase() === cleanEmail);
+
+    if (!account) {
+      logEvent('AUTH WARN', `Forgot password requested for non-existent email: '${cleanEmail}'`);
+      return res.status(404).json({ success: false, error: 'No user account found with this email address.' });
+    }
+
+    // Generate secure 48-char reset token and 1-hour expiration
+    const resetToken = crypto.randomBytes(24).toString('hex');
+    account.resetPasswordToken = resetToken;
+    account.resetPasswordExpires = Date.now() + 3600000; // 1 Hour
+
+    await saveAccount(account);
+
+    const clientOrigin = reqOrigin || req.headers.origin || 'http://localhost:5173';
+    const resetLink = `${clientOrigin}/#/reset-password?token=${resetToken}&email=${encodeURIComponent(account.email)}`;
+
+    const mailResult = await sendResetPasswordEmail(account.email, account.name, resetLink);
+
+    logEvent('AUTH RESET REQUEST', `Password reset token generated for '${account.email}'`);
+    return res.json({
+      success: true,
+      message: `Password reset link has been dispatched to ${account.email}. Please check your inbox.`,
+      resetLink,
+      previewUrl: mailResult.previewUrl,
+    });
+  }
+
+  if (action === 'verify-reset-token') {
+    const { token: reqToken, email: reqEmail } = req.body;
+    if (!reqToken || !reqEmail) {
+      return res.status(400).json({ success: false, error: 'Reset token and email are required.' });
+    }
+    const cleanEmail = reqEmail.trim().toLowerCase();
+    const account = accounts.find((a) => a.email && a.email.toLowerCase() === cleanEmail);
+
+    if (!account || !account.resetPasswordToken || account.resetPasswordToken !== reqToken) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired password reset link.' });
+    }
+
+    if (account.resetPasswordExpires && Date.now() > account.resetPasswordExpires) {
+      return res.status(400).json({ success: false, error: 'This password reset link has expired. Please request a new one.' });
+    }
+
+    return res.json({ success: true, email: account.email, name: account.name });
+  }
+
+  if (action === 'reset-password') {
+    const { token: reqToken, email: reqEmail, newPassword } = req.body;
+    if (!reqToken || !reqEmail || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Token, email, and new password are required.' });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 4 characters long.' });
+    }
+    const cleanEmail = reqEmail.trim().toLowerCase();
+    const account = accounts.find((a) => a.email && a.email.toLowerCase() === cleanEmail);
+
+    if (!account || !account.resetPasswordToken || account.resetPasswordToken !== reqToken) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired password reset link.' });
+    }
+
+    if (account.resetPasswordExpires && Date.now() > account.resetPasswordExpires) {
+      return res.status(400).json({ success: false, error: 'This password reset link has expired. Please request a new one.' });
+    }
+
+    account.password = newPassword;
+    delete account.resetPasswordToken;
+    delete account.resetPasswordExpires;
+
+    await saveAccount(account);
+    logEvent('AUTH PASSWORD RESET', `Password successfully updated for user: '${account.email}'`);
+    return res.json({ success: true, message: 'Password has been updated successfully! You can now sign in with your new password.' });
+  }
+
   return res.status(400).json({ success: false, error: 'Invalid auth action specified.' });
 });
 
@@ -572,9 +817,20 @@ app.post('/api/rooms', async (req, res) => {
   }
 
   if (action === 'claimPayment') {
-    const { payment } = req.body;
+    const { payment, userId } = req.body;
     const targetRoom = rooms.find((r) => r.code === code);
     if (!targetRoom) return res.status(404).json({ success: false, error: 'Room not found.' });
+
+    // Validate permission: only debtor, receiver, or host can record settlement payment
+    const isPayer = !userId || payment.fromId === userId || (payment.fromName && payment.fromName.toLowerCase() === userId.toLowerCase());
+    const isReceiver = userId && (payment.toId === userId || (payment.toName && payment.toName.toLowerCase() === userId.toLowerCase()));
+    const isHost = userId && targetRoom.hostId === userId;
+
+    if (userId && !isPayer && !isReceiver && !isHost) {
+      logEvent('UNAUTHORIZED CLAIM', `Blocked user '${userId}' from claiming payment for debt between '${payment.fromName}' and '${payment.toName}'`);
+      return res.status(403).json({ success: false, error: 'Permission Denied: Only the member who owes this debt or the Room Host can mark it paid.' });
+    }
+
     targetRoom.settlementHistory = targetRoom.settlementHistory || [];
 
     // Remove any previous pending/declined claim for the exact same transaction
@@ -592,12 +848,18 @@ app.post('/api/rooms', async (req, res) => {
   }
 
   if (action === 'approvePayment') {
-    const { paymentId } = req.body;
+    const { paymentId, userId } = req.body;
     const targetRoom = rooms.find((r) => r.code === code);
     if (!targetRoom) return res.status(404).json({ success: false, error: 'Room not found.' });
     targetRoom.settlementHistory = targetRoom.settlementHistory || [];
     const item = targetRoom.settlementHistory.find((p) => p.id === paymentId);
     if (item) {
+      const isReceiver = !userId || item.toId === userId || (item.toName && item.toName.toLowerCase() === userId.toLowerCase());
+      const isHost = userId && targetRoom.hostId === userId;
+      if (userId && !isReceiver && !isHost) {
+        logEvent('UNAUTHORIZED APPROVE', `Blocked user '${userId}' from approving payment ID '${paymentId}'`);
+        return res.status(403).json({ success: false, error: 'Permission Denied: Only the recipient of this payment can approve it.' });
+      }
       item.status = 'PAID';
       item.verifiedAt = new Date().toISOString();
       await saveRoom(targetRoom);
@@ -607,12 +869,18 @@ app.post('/api/rooms', async (req, res) => {
   }
 
   if (action === 'declinePayment') {
-    const { paymentId } = req.body;
+    const { paymentId, userId } = req.body;
     const targetRoom = rooms.find((r) => r.code === code);
     if (!targetRoom) return res.status(404).json({ success: false, error: 'Room not found.' });
     targetRoom.settlementHistory = targetRoom.settlementHistory || [];
     const item = targetRoom.settlementHistory.find((p) => p.id === paymentId);
     if (item) {
+      const isReceiver = !userId || item.toId === userId || (item.toName && item.toName.toLowerCase() === userId.toLowerCase());
+      const isHost = userId && targetRoom.hostId === userId;
+      if (userId && !isReceiver && !isHost) {
+        logEvent('UNAUTHORIZED DECLINE', `Blocked user '${userId}' from declining payment ID '${paymentId}'`);
+        return res.status(403).json({ success: false, error: 'Permission Denied: Only the recipient of this payment can decline it.' });
+      }
       item.status = 'DECLINED';
       item.declinedAt = new Date().toISOString();
       await saveRoom(targetRoom);

@@ -10,6 +10,7 @@ import { RoomPage } from './pages/RoomPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { AuthPage } from './pages/AuthPage';
 import { AdminPage } from './pages/AdminPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { ExpenseModal } from './components/ExpenseModal';
 import { AuthModal } from './components/AuthModal';
 import { QrCodeModal } from './components/QrCodeModal';
@@ -214,23 +215,23 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col md:flex-row overflow-hidden font-sans bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
       {/* Mobile Screen Header Bar */}
-      {currentUser && route.view !== 'landing' && route.view !== 'auth' && (
-        <div className="h-14 bg-white border-b border-slate-200 px-4 flex md:hidden items-center justify-between shrink-0 z-30 shadow-xs">
-          <div className="flex items-center gap-3">
+      {currentUser && route.view !== 'landing' && route.view !== 'auth' && route.view !== 'reset-password' && (
+        <div className="h-14 bg-white border-b border-slate-200 px-3 sm:px-4 flex md:hidden items-center justify-between shrink-0 z-30 shadow-xs">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setIsSidebarOpenMobile(!isSidebarOpenMobile)}
-              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-orange-50 hover:text-orange-600 transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-orange-50 hover:text-orange-600 transition-colors cursor-pointer shrink-0"
               title="Toggle Menu"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigateTo('dashboard')}>
+            <div className="flex items-center gap-2 cursor-pointer min-w-0" onClick={() => navigateTo('dashboard')}>
               <img src="/logo.png" alt="SettleKnot" className="w-8 h-8 rounded-xl object-cover shadow-xs border border-slate-200 shrink-0" />
-              <span className="font-tech font-bold text-sm text-slate-900">SettleKnot</span>
+              <span className="font-tech font-bold text-sm text-slate-900 truncate">SettleKnot</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={handleManualRefresh}
               className="p-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-tech font-bold flex items-center gap-1 transition-all cursor-pointer"
@@ -239,7 +240,7 @@ export default function App() {
               <span className="text-[11px]">Refresh 🔄</span>
             </button>
             {currentUser.isAdmin && (
-              <span className="text-[10px] font-tech font-bold uppercase bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">
+              <span className="text-[10px] font-tech font-bold uppercase bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300 shrink-0">
                 Admin ⚡
               </span>
             )}
@@ -248,7 +249,7 @@ export default function App() {
       )}
 
       {/* Left Sidebar for authenticated app views */}
-      {currentUser && route.view !== 'landing' && route.view !== 'auth' && (
+      {currentUser && route.view !== 'landing' && route.view !== 'auth' && route.view !== 'reset-password' && (
         <Sidebar
           currentUser={currentUser}
           currentRoom={currentRoom}
@@ -276,8 +277,8 @@ export default function App() {
 
       {/* Right Column: Scrollable Main Content Pane */}
       <div className={`flex-1 flex flex-col min-w-0 ${currentUser ? 'h-[calc(100vh-3.5rem)] md:h-screen' : 'h-screen'} overflow-hidden`}>
-        {/* Render Navbar header ONLY when unauthenticated and not on Landing or Auth pages */}
-        {!currentUser && effectiveRoute.view !== 'landing' && effectiveRoute.view !== 'auth' && (
+        {/* Render Navbar header ONLY when unauthenticated and not on Landing, Auth, or Reset Password pages */}
+        {!currentUser && effectiveRoute.view !== 'landing' && effectiveRoute.view !== 'auth' && effectiveRoute.view !== 'reset-password' && (
           <Navbar
             room={null}
             currentUser={null}
@@ -359,12 +360,16 @@ export default function App() {
 
           {route.view === 'auth' && (
             <AuthPage
-              initialTab={route.param === 'register' ? 'register' : 'login'}
+              initialTab={route.param === 'register' ? 'register' : route.param === 'forgot' ? 'forgot' : 'login'}
               onUserAuthenticated={(user) => {
                 setCurrentUser(user);
                 syncServerRooms().then(setRooms);
               }}
             />
+          )}
+
+          {effectiveRoute.view === 'reset-password' && (
+            <ResetPasswordPage />
           )}
         </main>
       </div>

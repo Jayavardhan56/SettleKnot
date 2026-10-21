@@ -170,3 +170,117 @@ export async function deleteUserAccount(userId: string): Promise<User[]> {
   saveStoredAccounts(accounts);
   return accounts;
 }
+
+export async function signInWithGoogle(profile: { name: string; email: string; avatar?: string; id?: string }): Promise<{ success: boolean; user?: User; error?: string }> {
+  try {
+    const data = await fetchApi<{ success: boolean; account?: User; error?: string }>('/api/auth', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'google-auth',
+        name: profile.name,
+        email: profile.email,
+        avatar: profile.avatar,
+        googleId: profile.id,
+      }),
+    });
+
+    if (data.success && data.account) {
+      saveStoredCurrentUser(data.account);
+      const accounts = getStoredAccounts();
+      const existingIdx = accounts.findIndex((a) => a.email.toLowerCase() === data.account!.email.toLowerCase());
+      if (existingIdx >= 0) accounts[existingIdx] = data.account;
+      else accounts.push(data.account);
+      saveStoredAccounts(accounts);
+      return { success: true, user: data.account };
+    }
+    return { success: false, error: data.error || 'Google sign in failed.' };
+  } catch (err: any) {
+    // Local fallback for offline mode
+    const accounts = getStoredAccounts();
+    let account = accounts.find((a) => a.email.toLowerCase() === profile.email.toLowerCase());
+    if (!account) {
+      account = {
+        id: `usr_g_${Date.now()}`,
+        name: profile.name,
+        email: profile.email.toLowerCase(),
+        avatar: profile.avatar || '🌐',
+        createdAt: new Date().toISOString(),
+        isGoogleAuth: true,
+        isAdmin: profile.email.toLowerCase() === 'settleknot@admin.in',
+      };
+      accounts.push(account);
+      saveStoredAccounts(accounts);
+    }
+    saveStoredCurrentUser(account);
+    return { success: true, user: account };
+  }
+}
+
+export async function requestPasswordReset(email: string): Promise<{ success: boolean; message?: string; resetLink?: string; previewUrl?: string; error?: string }> {
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
+    const data = await fetchApi<{ success: boolean; message?: string; resetLink?: string; previewUrl?: string; error?: string }>('/api/auth', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'forgot-password', email, origin }),
+    });
+    return data;
+  } catch (err: any) {
+    // Local fallback
+    const accounts = getStoredAccounts();
+    const account = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
+    if (!account) {
+      return { success: false, error: 'No user account found with this email address.' };
+    }
+    const token = Math.random().toString(36).substr(2) + Date.now().toString(36);
+    account.resetPasswordToken = token;
+    account.resetPasswordExpires = Date.now() + 3600000;
+    saveStoredAccounts(accounts);
+    const link = `${window.location.origin}/#/reset-password?token=${token}&email=${encodeURIComponent(account.email)}`;
+    return {
+      success: true,
+      message: `Password reset link generated for ${email}. Check link below.`,
+      resetLink: link,
+    };
+  }
+}
+
+export async function verifyResetToken(token: string, email: string): Promise<{ success: boolean; error?: string; name?: string; email?: string }> {
+  try {
+    const data = await fetchApi<{ success: boolean; error?: string; name?: string; email?: string }>('/api/auth', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'verify-reset-token', token, email }),
+    });
+    return data;
+  } catch (err: any) {
+    const accounts = getStoredAccounts();
+    const account = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
+    if (!account || account.resetPasswordToken !== token) {
+      return { success: false, error: 'Invalid or expired password reset link.' };
+    }
+    if (account.resetPasswordExpires && Date.now() > account.resetPasswordExpires) {
+      return { success: false, error: 'Password reset link has expired.' };
+    }
+    return { success: true, email: account.email, name: account.name };
+  }
+}
+
+export async function resetUserPassword(token: string, email: string, newPassword: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const data = await fetchApi<{ success: boolean; message?: string; error?: string }>('/api/auth', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reset-password', token, email, newPassword }),
+    });
+    return data;
+  } catch (err: any) {
+    const accounts = getStoredAccounts();
+    const account = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
+    if (!account || account.resetPasswordToken !== token) {
+      return { success: false, error: 'Invalid or expired password reset link.' };
+    }
+    account.password = newPassword;
+    delete account.resetPasswordToken;
+    delete account.resetPasswordExpires;
+    saveStoredAccounts(accounts);
+    return { success: true, message: 'Password updated successfully! You can now log in.' };
+  }
+}

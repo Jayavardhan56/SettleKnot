@@ -6,6 +6,10 @@ export interface User {
   avatar: string;
   createdAt?: string;
   isAdmin?: boolean;
+  isGoogleAuth?: boolean;
+  googleId?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: number;
 }
 
 export interface Member {
@@ -96,6 +100,6 @@ export interface Room {
 }
 
 export interface RouteState {
-  view: 'landing' | 'dashboard' | 'room' | 'notifications' | 'auth' | 'admin';
+  view: 'landing' | 'dashboard' | 'room' | 'notifications' | 'auth' | 'admin' | 'reset-password';
   param: string | null;
 }

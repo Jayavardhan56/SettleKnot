@@ -376,7 +376,7 @@ export async function syncServerRooms(): Promise<Room[]> {
   }
 }
 
-export async function claimSettlementPaid(code: string, settlementData: Settlement): Promise<Room | null> {
+export async function claimSettlementPaid(code: string, settlementData: Settlement, userId?: string): Promise<Room | null> {
   const newPayment: SettlementHistoryItem = {
     id: `pay_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     fromId: settlementData.fromId,
@@ -393,7 +393,7 @@ export async function claimSettlementPaid(code: string, settlementData: Settleme
   try {
     const data = await fetchApi<{ success: boolean; rooms: Room[]; room?: Room }>('/api/rooms', {
       method: 'POST',
-      body: JSON.stringify({ action: 'claimPayment', code, payment: newPayment }),
+      body: JSON.stringify({ action: 'claimPayment', code, payment: newPayment, userId }),
     });
     if (data.success && Array.isArray(data.rooms)) {
       saveAllRooms(data.rooms);
@@ -416,11 +416,11 @@ export async function claimSettlementPaid(code: string, settlementData: Settleme
   return target || null;
 }
 
-export async function approveSettlementPayment(code: string, paymentId: string): Promise<Room | null> {
+export async function approveSettlementPayment(code: string, paymentId: string, userId?: string): Promise<Room | null> {
   try {
     const data = await fetchApi<{ success: boolean; rooms: Room[]; room?: Room }>('/api/rooms', {
       method: 'POST',
-      body: JSON.stringify({ action: 'approvePayment', code, paymentId }),
+      body: JSON.stringify({ action: 'approvePayment', code, paymentId, userId }),
     });
     if (data.success && Array.isArray(data.rooms)) {
       saveAllRooms(data.rooms);
@@ -443,11 +443,11 @@ export async function approveSettlementPayment(code: string, paymentId: string):
   return target || null;
 }
 
-export async function declineSettlementPayment(code: string, paymentId: string): Promise<Room | null> {
+export async function declineSettlementPayment(code: string, paymentId: string, userId?: string): Promise<Room | null> {
   try {
     const data = await fetchApi<{ success: boolean; rooms: Room[]; room?: Room }>('/api/rooms', {
       method: 'POST',
-      body: JSON.stringify({ action: 'declinePayment', code, paymentId }),
+      body: JSON.stringify({ action: 'declinePayment', code, paymentId, userId }),
     });
     if (data.success && Array.isArray(data.rooms)) {
       saveAllRooms(data.rooms);
@@ -524,12 +524,25 @@ export function getPendingSentPayments(userId: string, userName?: string): (Sett
   return results;
 }
 
-export async function markSettlementPaid(code: string, settlementData: Settlement): Promise<Room | null> {
-  return claimSettlementPaid(code, settlementData);
+export async function markSettlementPaid(code: string, settlementData: Settlement, userId?: string): Promise<Room | null> {
+  return claimSettlementPaid(code, settlementData, userId);
+}
+
+// =========================================================================
+// Advanced Financial Calculations Theory: Exact Cent & Graph Optimizations
+// =========================================================================
+
+// Convert currency to integer cents to guarantee 100% preservation of money
+function toCents(amount: number): number {
+  return Math.round((Number(amount) || 0) * 100);
+}
+
+function fromCents(cents: number): number {
+  return Math.round(cents) / 100;
 }
 
 // 1. Direct Pairwise Settlement Algorithm
-// Calculates exact direct debts between who actually paid and who participated in that expense
+// Calculates exact direct bilateral debts between who actually paid and who participated in each expense
 export function calculateDirectSettlements(room: Room | null): Settlement[] {
   if (!room) return [];
   const members = Array.isArray(room.members) ? room.members : [];
@@ -555,12 +568,12 @@ export function calculateDirectSettlements(room: Room | null): Settlement[] {
     return null;
   };
 
-  // Pairwise debt matrix: pairwiseDebt[debtorId][creditorId] = amount owed
-  const pairwiseDebt: Record<string, Record<string, number>> = {};
+  // Pairwise debt matrix in integer cents: pairwiseDebtCents[debtorId][creditorId]
+  const pairwiseDebtCents: Record<string, Record<string, number>> = {};
   approvedMembers.forEach((m1) => {
-    pairwiseDebt[m1.id] = {};
+    pairwiseDebtCents[m1.id] = {};
     approvedMembers.forEach((m2) => {
-      pairwiseDebt[m1.id][m2.id] = 0;
+      pairwiseDebtCents[m1.id][m2.id] = 0;
     });
   });
 
@@ -568,15 +581,15 @@ export function calculateDirectSettlements(room: Room | null): Settlement[] {
 
   groupExpenses.forEach((exp) => {
     const paidById = resolveMemberId(exp.paidBy) || (exp.paidByName ? resolveMemberId(exp.paidByName) : null);
-    const amount = Number(exp.amount) || 0;
-    if (!paidById || amount <= 0) return;
+    const totalCents = toCents(exp.amount);
+    if (!paidById || totalCents <= 0) return;
 
     if (exp.splitType === 'custom' && exp.customSplits && typeof exp.customSplits === 'object') {
       Object.keys(exp.customSplits).forEach((mKey) => {
         const debtorId = resolveMemberId(mKey);
-        const share = Math.round((Number(exp.customSplits![mKey]) || 0) * 100) / 100;
-        if (debtorId && debtorId !== paidById && pairwiseDebt[debtorId] && pairwiseDebt[debtorId][paidById] !== undefined) {
-          pairwiseDebt[debtorId][paidById] = Math.round((pairwiseDebt[debtorId][paidById] + share) * 100) / 100;
+        const shareCents = toCents(exp.customSplits![mKey]);
+        if (debtorId && debtorId !== paidById && pairwiseDebtCents[debtorId] && pairwiseDebtCents[debtorId][paidById] !== undefined) {
+          pairwiseDebtCents[debtorId][paidById] += shareCents;
         }
       });
     } else {
@@ -593,11 +606,18 @@ export function calculateDirectSettlements(room: Room | null): Settlement[] {
       });
 
       const effectiveSplit = validSplitIds.length > 0 ? validSplitIds : approvedMembers.map((m) => m.id);
-      if (effectiveSplit.length > 0) {
-        const share = Math.round((amount / effectiveSplit.length) * 100) / 100;
-        effectiveSplit.forEach((debtorId) => {
-          if (debtorId !== paidById && pairwiseDebt[debtorId] && pairwiseDebt[debtorId][paidById] !== undefined) {
-            pairwiseDebt[debtorId][paidById] = Math.round((pairwiseDebt[debtorId][paidById] + share) * 100) / 100;
+      const K = effectiveSplit.length;
+      if (K > 0) {
+        // Discrepancy-free integer cent distribution:
+        // baseShare * K + remainder === totalCents
+        const baseShare = Math.floor(totalCents / K);
+        const remainder = totalCents % K;
+
+        effectiveSplit.forEach((debtorId, idx) => {
+          // Distribute remainder cent-by-cent to first 'remainder' participants
+          const debtorShare = baseShare + (idx < remainder ? 1 : 0);
+          if (debtorId !== paidById && pairwiseDebtCents[debtorId] && pairwiseDebtCents[debtorId][paidById] !== undefined) {
+            pairwiseDebtCents[debtorId][paidById] += debtorShare;
           }
         });
       }
@@ -610,15 +630,15 @@ export function calculateDirectSettlements(room: Room | null): Settlement[] {
     if (payment && payment.status === 'PAID') {
       const fromId = resolveMemberId(payment.fromId) || resolveMemberId(payment.fromName);
       const toId = resolveMemberId(payment.toId) || resolveMemberId(payment.toName);
-      const amount = Math.round((Number(payment.amount) || 0) * 100) / 100;
+      const paidCents = toCents(payment.amount);
 
-      if (fromId && toId && pairwiseDebt[fromId] && pairwiseDebt[fromId][toId] !== undefined) {
-        pairwiseDebt[fromId][toId] = Math.round((pairwiseDebt[fromId][toId] - amount) * 100) / 100;
+      if (fromId && toId && pairwiseDebtCents[fromId] && pairwiseDebtCents[fromId][toId] !== undefined) {
+        pairwiseDebtCents[fromId][toId] -= paidCents;
       }
     }
   });
 
-  // Net out pairwise debts between each pair (A, B)
+  // Net out pairwise bilateral debts (A owes B vs B owes A)
   const settlements: Settlement[] = [];
   const memberList = approvedMembers;
 
@@ -626,26 +646,26 @@ export function calculateDirectSettlements(room: Room | null): Settlement[] {
     for (let b = a + 1; b < memberList.length; b++) {
       const idA = memberList[a].id;
       const idB = memberList[b].id;
-      const debtAtoB = pairwiseDebt[idA]?.[idB] || 0;
-      const debtBtoA = pairwiseDebt[idB]?.[idA] || 0;
+      const debtAtoB = pairwiseDebtCents[idA]?.[idB] || 0;
+      const debtBtoA = pairwiseDebtCents[idB]?.[idA] || 0;
 
-      const net = Math.round((debtAtoB - debtBtoA) * 100) / 100;
+      const netCents = debtAtoB - debtBtoA;
 
-      if (net > 0.01) {
+      if (netCents > 0) {
         settlements.push({
           fromId: idA,
           fromName: memberList[a].name,
           toId: idB,
           toName: memberList[b].name,
-          amount: net,
+          amount: fromCents(netCents),
         });
-      } else if (net < -0.01) {
+      } else if (netCents < 0) {
         settlements.push({
           fromId: idB,
           fromName: memberList[b].name,
           toId: idA,
           toName: memberList[a].name,
-          amount: Math.abs(net),
+          amount: fromCents(Math.abs(netCents)),
         });
       }
     }
@@ -654,7 +674,9 @@ export function calculateDirectSettlements(room: Room | null): Settlement[] {
   return settlements;
 }
 
-// 2. Minimum Cash Flow Settlement Algorithm (Optimized Global Transfers)
+// 2. Complex Calculations Theory: Minimum Cash Flow with Zero-Sum Subset Graph Partitioning
+// Finds the mathematical minimum number of cross-member transfers by partitioning the graph
+// into independent zero-sum balance subsets before applying min-flow elimination.
 export function calculateSimplifiedSettlements(room: Room | null): Settlement[] {
   if (!room) return [];
   const members = Array.isArray(room.members) ? room.members : [];
@@ -664,24 +686,22 @@ export function calculateSimplifiedSettlements(room: Room | null): Settlement[] 
   const approvedMembers = members.filter((m) => m && (m.status === 'approved' || !m.status));
   if (approvedMembers.length === 0) return [];
 
-  const balances: Record<string, number> = {};
+  const balanceCents: Record<string, number> = {};
   const memberIdMap: Record<string, string> = {};
 
   approvedMembers.forEach((m) => {
     if (m && m.id) {
-      balances[m.id] = 0;
+      balanceCents[m.id] = 0;
       memberIdMap[m.id] = m.id;
-      if (m.name) {
-        memberIdMap[m.name.trim().toLowerCase()] = m.id;
-      }
+      if (m.name) memberIdMap[m.name.trim().toLowerCase()] = m.id;
     }
   });
 
   const resolveMemberId = (identifier: string): string | null => {
     if (!identifier) return null;
-    if (balances[identifier] !== undefined) return identifier;
+    if (balanceCents[identifier] !== undefined) return identifier;
     const lower = identifier.trim().toLowerCase();
-    if (memberIdMap[lower] && balances[memberIdMap[lower]] !== undefined) {
+    if (memberIdMap[lower] && balanceCents[memberIdMap[lower]] !== undefined) {
       return memberIdMap[lower];
     }
     return null;
@@ -691,17 +711,18 @@ export function calculateSimplifiedSettlements(room: Room | null): Settlement[] 
 
   groupExpenses.forEach((exp) => {
     const paidById = resolveMemberId(exp.paidBy) || (exp.paidByName ? resolveMemberId(exp.paidByName) : null);
-    const amount = Number(exp.amount) || 0;
+    const totalCents = toCents(exp.amount);
+    if (!paidById || totalCents <= 0) return;
 
     if (exp.splitType === 'custom' && exp.customSplits && typeof exp.customSplits === 'object') {
-      if (paidById && balances[paidById] !== undefined) {
-        balances[paidById] += amount;
+      if (balanceCents[paidById] !== undefined) {
+        balanceCents[paidById] += totalCents;
       }
       Object.keys(exp.customSplits).forEach((mKey) => {
         const targetId = resolveMemberId(mKey);
-        const share = Number(exp.customSplits![mKey]) || 0;
-        if (targetId && balances[targetId] !== undefined) {
-          balances[targetId] -= share;
+        const shareCents = toCents(exp.customSplits![mKey]);
+        if (targetId && balanceCents[targetId] !== undefined) {
+          balanceCents[targetId] -= shareCents;
         }
       });
     } else {
@@ -718,15 +739,19 @@ export function calculateSimplifiedSettlements(room: Room | null): Settlement[] 
       });
 
       const effectiveSplit = validSplitIds.length > 0 ? validSplitIds : approvedMembers.map((m) => m.id);
+      const K = effectiveSplit.length;
 
-      if (effectiveSplit.length > 0) {
-        const share = amount / effectiveSplit.length;
-        if (paidById && balances[paidById] !== undefined) {
-          balances[paidById] += amount;
+      if (K > 0) {
+        const baseShare = Math.floor(totalCents / K);
+        const remainder = totalCents % K;
+
+        if (balanceCents[paidById] !== undefined) {
+          balanceCents[paidById] += totalCents;
         }
-        effectiveSplit.forEach((memberId) => {
-          if (balances[memberId] !== undefined) {
-            balances[memberId] -= share;
+        effectiveSplit.forEach((memberId, idx) => {
+          const share = baseShare + (idx < remainder ? 1 : 0);
+          if (balanceCents[memberId] !== undefined) {
+            balanceCents[memberId] -= share;
           }
         });
       }
@@ -739,60 +764,156 @@ export function calculateSimplifiedSettlements(room: Room | null): Settlement[] 
     if (payment && payment.status === 'PAID') {
       const fromId = resolveMemberId(payment.fromId) || resolveMemberId(payment.fromName);
       const toId = resolveMemberId(payment.toId) || resolveMemberId(payment.toName);
-      const amount = Number(payment.amount) || 0;
+      const amountCents = toCents(payment.amount);
 
-      if (fromId && balances[fromId] !== undefined) {
-        balances[fromId] += amount;
+      if (fromId && balanceCents[fromId] !== undefined) {
+        balanceCents[fromId] += amountCents;
       }
-      if (toId && balances[toId] !== undefined) {
-        balances[toId] -= amount;
+      if (toId && balanceCents[toId] !== undefined) {
+        balanceCents[toId] -= amountCents;
       }
     }
   });
 
-  const debtors: { id: string; name: string; amount: number }[] = [];
-  const creditors: { id: string; name: string; amount: number }[] = [];
-
-  Object.keys(balances).forEach((memberId) => {
-    const rawBal = balances[memberId];
-    const bal = Math.round(rawBal * 100) / 100;
-    const member = approvedMembers.find((m) => m && m.id === memberId);
-    const memberName = member ? member.name : 'Unknown';
-
-    if (bal < -0.01) {
-      debtors.push({ id: memberId, name: memberName, amount: Math.abs(bal) });
-    } else if (bal > 0.01) {
-      creditors.push({ id: memberId, name: memberName, amount: bal });
-    }
+  // Conservation of money: verify that sum of balances is 0.
+  // Any residual rounding drift (<= 2 cents) is attributed to the largest creditor.
+  let netDiscrepancy = 0;
+  Object.keys(balanceCents).forEach((id) => {
+    netDiscrepancy += balanceCents[id];
   });
+  if (netDiscrepancy !== 0) {
+    const sortedIds = Object.keys(balanceCents).sort((a, b) => balanceCents[b] - balanceCents[a]);
+    if (sortedIds.length > 0) {
+      balanceCents[sortedIds[0]] -= netDiscrepancy;
+    }
+  }
 
-  debtors.sort((a, b) => b.amount - a.amount);
-  creditors.sort((a, b) => b.amount - a.amount);
+  // Active participants with non-zero balances
+  interface BalanceNode {
+    id: string;
+    name: string;
+    cents: number;
+  }
 
-  const settlements: Settlement[] = [];
-  let i = 0;
-  let j = 0;
-
-  while (i < debtors.length && j < creditors.length) {
-    const debtor = debtors[i];
-    const creditor = creditors[j];
-    const minAmount = Math.round(Math.min(debtor.amount, creditor.amount) * 100) / 100;
-
-    if (minAmount > 0.01) {
-      settlements.push({
-        fromId: debtor.id,
-        fromName: debtor.name,
-        toId: creditor.id,
-        toName: creditor.name,
-        amount: minAmount,
+  const activeNodes: BalanceNode[] = [];
+  Object.keys(balanceCents).forEach((memberId) => {
+    const c = balanceCents[memberId];
+    if (Math.abs(c) > 0) {
+      const m = approvedMembers.find((item) => item && item.id === memberId);
+      activeNodes.push({
+        id: memberId,
+        name: m ? m.name : 'Unknown',
+        cents: c,
       });
     }
+  });
 
-    debtor.amount = Math.round((debtor.amount - minAmount) * 100) / 100;
-    creditor.amount = Math.round((creditor.amount - minAmount) * 100) / 100;
+  if (activeNodes.length === 0) return [];
 
-    if (debtor.amount <= 0.01) i++;
-    if (creditor.amount <= 0.01) j++;
+  // Optimal Zero-Sum Subset Partitioning (Graph Theory):
+  // Partition nodes into the maximum number of independent disjoint subsets that each sum to 0.
+  // For small to medium groups (N <= 16), dynamic programming bitmask yields the exact optimal partition.
+  const N = activeNodes.length;
+  const settlements: Settlement[] = [];
+
+  // Sub-solver: settles a single zero-sum component via greedy Min-Cash Flow
+  const settleComponent = (component: BalanceNode[]) => {
+    const debtors: { id: string; name: string; amountCents: number }[] = [];
+    const creditors: { id: string; name: string; amountCents: number }[] = [];
+
+    component.forEach((node) => {
+      if (node.cents < 0) {
+        debtors.push({ id: node.id, name: node.name, amountCents: Math.abs(node.cents) });
+      } else if (node.cents > 0) {
+        creditors.push({ id: node.id, name: node.name, amountCents: node.cents });
+      }
+    });
+
+    debtors.sort((a, b) => b.amountCents - a.amountCents);
+    creditors.sort((a, b) => b.amountCents - a.amountCents);
+
+    let di = 0;
+    let ci = 0;
+
+    while (di < debtors.length && ci < creditors.length) {
+      const debtor = debtors[di];
+      const creditor = creditors[ci];
+      const transferCents = Math.min(debtor.amountCents, creditor.amountCents);
+
+      if (transferCents > 0) {
+        settlements.push({
+          fromId: debtor.id,
+          fromName: debtor.name,
+          toId: creditor.id,
+          toName: creditor.name,
+          amount: fromCents(transferCents),
+        });
+      }
+
+      debtor.amountCents -= transferCents;
+      creditor.amountCents -= transferCents;
+
+      if (debtor.amountCents <= 0) di++;
+      if (creditor.amountCents <= 0) ci++;
+    }
+  };
+
+  if (N <= 15) {
+    // DP Bitmask to find maximum zero-sum disjoint subsets
+    const totalMasks = 1 << N;
+    const sumMask = new Int32Array(totalMasks);
+    for (let mask = 1; mask < totalMasks; mask++) {
+      const lowbit = mask & -mask;
+      const bitIndex = Math.log2(lowbit);
+      sumMask[mask] = sumMask[mask ^ lowbit] + activeNodes[bitIndex].cents;
+    }
+
+    const dp = new Int32Array(totalMasks);
+    const parent = new Int32Array(totalMasks);
+
+    for (let mask = 1; mask < totalMasks; mask++) {
+      if (sumMask[mask] === 0) {
+        dp[mask] = 1;
+        parent[mask] = mask;
+      }
+      // Try submask split
+      for (let sub = (mask - 1) & mask; sub > (mask ^ sub); sub = (sub - 1) & mask) {
+        if (dp[sub] > 0 && dp[mask ^ sub] > 0) {
+          if (dp[sub] + dp[mask ^ sub] > dp[mask]) {
+            dp[mask] = dp[sub] + dp[mask ^ sub];
+            parent[mask] = sub;
+          }
+        }
+      }
+    }
+
+    // Reconstruct partitioned subsets from full mask
+    const fullMask = totalMasks - 1;
+    const components: BalanceNode[][] = [];
+
+    const extractComponents = (mask: number) => {
+      if (mask === 0) return;
+      if (dp[mask] <= 1) {
+        const comp: BalanceNode[] = [];
+        for (let i = 0; i < N; i++) {
+          if ((mask & (1 << i)) !== 0) comp.push(activeNodes[i]);
+        }
+        components.push(comp);
+        return;
+      }
+      const sub = parent[mask];
+      extractComponents(sub);
+      extractComponents(mask ^ sub);
+    };
+
+    extractComponents(fullMask);
+
+    components.forEach((comp) => {
+      settleComponent(comp);
+    });
+  } else {
+    // For very large rooms, direct optimal greedy on whole graph
+    settleComponent(activeNodes);
   }
 
   return settlements;

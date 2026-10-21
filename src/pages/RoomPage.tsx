@@ -62,7 +62,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
 
   const handleClaimPaid = async (settlement: Settlement) => {
     if (confirm(`Mark ₹${settlement.amount.toFixed(2)} as paid to '${settlement.toName}'?\n\n'${settlement.toName}' will receive a verification notification to confirm receipt.`)) {
-      await claimSettlementPaid(room.code, settlement);
+      await claimSettlementPaid(room.code, settlement, currentUser?.id);
       const updatedRooms = await syncServerRooms();
       if (setRooms) setRooms(updatedRooms);
     }
@@ -70,7 +70,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
 
   const handleApprovePayment = async (paymentId: string, fromName: string, amount: number) => {
     if (confirm(`Confirm receipt of ₹${amount.toFixed(2)} from '${fromName}'?`)) {
-      await approveSettlementPayment(room.code, paymentId);
+      await approveSettlementPayment(room.code, paymentId, currentUser?.id);
       const updatedRooms = await syncServerRooms();
       if (setRooms) setRooms(updatedRooms);
       confetti({ particleCount: 70, spread: 70, origin: { y: 0.8 } });
@@ -79,7 +79,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
 
   const handleDeclinePayment = async (paymentId: string, fromName: string, amount: number) => {
     if (confirm(`Decline payment of ₹${amount.toFixed(2)} from '${fromName}'?\n\nThey will be notified that the payment was not received and asked to pay again.`)) {
-      await declineSettlementPayment(room.code, paymentId);
+      await declineSettlementPayment(room.code, paymentId, currentUser?.id);
       const updatedRooms = await syncServerRooms();
       if (setRooms) setRooms(updatedRooms);
     }
@@ -106,8 +106,9 @@ export const RoomPage: React.FC<RoomPageProps> = ({
 
   const renderSettlementAction = (s: Settlement) => {
     const claim = getClaimForSettlement(s);
-    const isReceiver = currentUser?.id === s.toId || currentUser?.name.toLowerCase() === s.toName.toLowerCase();
-    const isPayer = currentUser?.id === s.fromId || currentUser?.name.toLowerCase() === s.fromName.toLowerCase();
+    const isReceiver = isCurrentUser(s.toId, s.toName);
+    const isPayer = isCurrentUser(s.fromId, s.fromName);
+    const isHost = room.hostId === currentUser?.id;
 
     if (claim && claim.status === 'PENDING') {
       if (isReceiver) {
@@ -173,6 +174,20 @@ export const RoomPage: React.FC<RoomPageProps> = ({
       }
     }
 
+    // Unsettled debt: STRICT PERMISSIONS - only the person who owes can Mark Paid!
+    if (isPayer) {
+      return (
+        <button
+          onClick={() => handleClaimPaid(s)}
+          className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-tech font-bold text-[11px] sm:text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all whitespace-nowrap"
+          title="Mark as paid and notify receiver for confirmation"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>Mark Paid</span>
+        </button>
+      );
+    }
+
     if (isReceiver) {
       return (
         <button
@@ -186,15 +201,24 @@ export const RoomPage: React.FC<RoomPageProps> = ({
       );
     }
 
+    if (isHost) {
+      return (
+        <button
+          onClick={() => handleClaimPaid(s)}
+          className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-tech font-bold text-[10px] sm:text-[11px] flex items-center gap-1 border border-amber-200 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+          title="Room Host: Settle on behalf of members"
+        >
+          <span>👑 Host Settle</span>
+        </button>
+      );
+    }
+
+    // Other members: Show neutral unsettled status badge (NO action button)
     return (
-      <button
-        onClick={() => handleClaimPaid(s)}
-        className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-tech font-bold text-[11px] sm:text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all whitespace-nowrap"
-        title="Mark as paid and notify receiver for confirmation"
-      >
-        <CheckCircle2 className="w-3.5 h-3.5" />
-        <span>Mark Paid</span>
-      </button>
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-[10px] sm:text-[11px] font-tech font-bold whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+        <span>Unsettled</span>
+      </div>
     );
   };
 
@@ -487,35 +511,39 @@ export const RoomPage: React.FC<RoomPageProps> = ({
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center p-1 rounded-2xl bg-slate-200/60 border border-slate-200">
+      <div className="grid grid-cols-3 gap-1 p-1 rounded-2xl bg-slate-200/60 border border-slate-200">
         <button
           onClick={() => setActiveTab('settlements')}
-          className={`flex-1 py-2.5 rounded-xl font-tech font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`py-2 sm:py-2.5 px-1.5 sm:px-3 rounded-xl font-tech font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 transition-all cursor-pointer min-w-0 ${
             activeTab === 'settlements' ? 'bg-white text-orange-600 shadow-md' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Calculator className="w-4 h-4 text-emerald-600" />
-          <span>Debt & Settlement Summary ({settlements.length})</span>
+          <Calculator className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+          <span className="truncate">
+            <span className="hidden md:inline">Debt </span>Settlements ({settlements.length})
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('expenses')}
-          className={`flex-1 py-2.5 rounded-xl font-tech font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`py-2 sm:py-2.5 px-1.5 sm:px-3 rounded-xl font-tech font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 transition-all cursor-pointer min-w-0 ${
             activeTab === 'expenses' ? 'bg-white text-orange-600 shadow-md' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Receipt className="w-4 h-4 text-orange-600" />
-          <span>Logged Expenses ({visibleExpenses.length})</span>
+          <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-600 shrink-0" />
+          <span className="truncate">
+            <span className="hidden md:inline">Logged </span>Expenses ({visibleExpenses.length})
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('members')}
-          className={`flex-1 py-2.5 rounded-xl font-tech font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`py-2 sm:py-2.5 px-1.5 sm:px-3 rounded-xl font-tech font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 transition-all cursor-pointer min-w-0 ${
             activeTab === 'members' ? 'bg-white text-orange-600 shadow-md' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Users className="w-4 h-4 text-orange-600" />
-          <span>Members ({approvedMembers.length})</span>
+          <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-600 shrink-0" />
+          <span className="truncate">Members ({approvedMembers.length})</span>
         </button>
       </div>
 
@@ -712,13 +740,13 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                     key={idx}
                     className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-orange-300 transition-all shadow-2xs"
                   >
-                    <div className="flex items-center gap-2 text-sm font-sans">
-                      <span className="font-bold text-slate-900">{s.fromName}</span>
-                      <span className="text-xs font-tech font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-sans min-w-0">
+                      <span className="font-bold text-slate-900 truncate max-w-[120px] sm:max-w-none">{s.fromName}</span>
+                      <span className="text-[10px] sm:text-xs font-tech font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 shrink-0">
                         MUST PAY
                       </span>
-                      <ArrowRight className="w-4 h-4 text-slate-400" />
-                      <span className="font-bold text-slate-900">{s.toName}</span>
+                      <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 shrink-0" />
+                      <span className="font-bold text-slate-900 truncate max-w-[120px] sm:max-w-none">{s.toName}</span>
                     </div>
 
                     <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-0 border-slate-200 pt-2 sm:pt-0">
@@ -877,12 +905,12 @@ export const RoomPage: React.FC<RoomPageProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto justify-between md:justify-end">
               {/* Expense Filter Pills */}
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+              <div className="flex items-center justify-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs w-full sm:w-auto overflow-x-auto">
                 <button
                   onClick={() => setExpenseFilter('all')}
-                  className={`px-3 py-1 rounded-lg font-tech font-bold transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial px-3 py-1 rounded-lg font-tech font-bold transition-all cursor-pointer whitespace-nowrap ${
                     expenseFilter === 'all' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -890,7 +918,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                 </button>
                 <button
                   onClick={() => setExpenseFilter('group')}
-                  className={`px-3 py-1 rounded-lg font-tech font-bold transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial px-3 py-1 rounded-lg font-tech font-bold transition-all cursor-pointer whitespace-nowrap ${
                     expenseFilter === 'group' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -898,7 +926,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                 </button>
                 <button
                   onClick={() => setExpenseFilter('personal')}
-                  className={`px-3 py-1 rounded-lg font-tech font-bold transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial px-3 py-1 rounded-lg font-tech font-bold transition-all cursor-pointer whitespace-nowrap ${
                     expenseFilter === 'personal' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -908,7 +936,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
 
               <button
                 onClick={onOpenExpenseModal}
-                className="px-4 py-2.5 rounded-xl btn-tech-orange font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all shrink-0"
+                className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl btn-tech-orange font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>Log Expense</span>

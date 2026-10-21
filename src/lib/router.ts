@@ -14,6 +14,7 @@ export function getRouteFromHash(): RouteState {
   if (route === 'notifications') return { view: 'notifications', param };
   if (route === 'auth') return { view: 'auth', param };
   if (route === 'admin') return { view: 'admin', param };
+  if (route.startsWith('reset-password')) return { view: 'reset-password', param: hash.replace(/^reset-password\/?\??/, '') || param };
   if (route === 'about') return { view: 'landing', param: 'about' };
   if (route === 'features') return { view: 'landing', param: 'features' };
   if (route === 'workflow') return { view: 'landing', param: 'workflow' };
@@ -29,6 +30,7 @@ export function navigateTo(view: RouteState['view'] | string, param: string = ''
   else if (view === 'notifications') target = '#/notifications';
   else if (view === 'auth') target = param ? `#/auth/${param}` : '#/auth';
   else if (view === 'admin') target = '#/admin';
+  else if (view === 'reset-password') target = param ? `#/reset-password?${param}` : '#/reset-password';
   else if (view === 'features') target = '#/features';
   else if (view === 'workflow') target = '#/workflow';
   else if (view === 'about') target = '#/about';
