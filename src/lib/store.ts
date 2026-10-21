@@ -497,7 +497,7 @@ export function getPendingReceivedPayments(userId: string, userName?: string): (
   return results;
 }
 
-// Helper to get payment claims sent by the current user
+// Helper to get payment claims sent by the current user that are pending
 export function getPendingSentPayments(userId: string, userName?: string): (SettlementHistoryItem & { roomCode: string; roomName: string })[] {
   if (!userId && !userName) return [];
   const rooms = getAllRooms();
@@ -506,7 +506,7 @@ export function getPendingSentPayments(userId: string, userName?: string): (Sett
   rooms.forEach((room) => {
     if (!room || !Array.isArray(room.settlementHistory)) return;
     room.settlementHistory.forEach((p) => {
-      if (!p) return;
+      if (!p || p.status !== 'PENDING') return;
       const isSender =
         (userId && p.fromId === userId) ||
         (userName && p.fromName && p.fromName.toLowerCase() === userName.toLowerCase()) ||
@@ -528,8 +528,134 @@ export async function markSettlementPaid(code: string, settlementData: Settlemen
   return claimSettlementPaid(code, settlementData);
 }
 
-// Minimum Cash Flow Settlement Algorithm
-export function calculateSettlements(room: Room | null): Settlement[] {
+// 1. Direct Pairwise Settlement Algorithm
+// Calculates exact direct debts between who actually paid and who participated in that expense
+export function calculateDirectSettlements(room: Room | null): Settlement[] {
+  if (!room) return [];
+  const members = Array.isArray(room.members) ? room.members : [];
+  const expenses = Array.isArray(room.expenses) ? room.expenses : [];
+  if (members.length === 0) return [];
+
+  const approvedMembers = members.filter((m) => m && (m.status === 'approved' || !m.status));
+  if (approvedMembers.length === 0) return [];
+
+  const memberIdMap: Record<string, string> = {};
+  approvedMembers.forEach((m) => {
+    if (m && m.id) {
+      memberIdMap[m.id] = m.id;
+      if (m.name) memberIdMap[m.name.trim().toLowerCase()] = m.id;
+    }
+  });
+
+  const resolveMemberId = (identifier: string): string | null => {
+    if (!identifier) return null;
+    if (memberIdMap[identifier]) return memberIdMap[identifier];
+    const lower = identifier.trim().toLowerCase();
+    if (memberIdMap[lower]) return memberIdMap[lower];
+    return null;
+  };
+
+  // Pairwise debt matrix: pairwiseDebt[debtorId][creditorId] = amount owed
+  const pairwiseDebt: Record<string, Record<string, number>> = {};
+  approvedMembers.forEach((m1) => {
+    pairwiseDebt[m1.id] = {};
+    approvedMembers.forEach((m2) => {
+      pairwiseDebt[m1.id][m2.id] = 0;
+    });
+  });
+
+  const groupExpenses = expenses.filter((e) => e && !e.isPersonal);
+
+  groupExpenses.forEach((exp) => {
+    const paidById = resolveMemberId(exp.paidBy) || (exp.paidByName ? resolveMemberId(exp.paidByName) : null);
+    const amount = Number(exp.amount) || 0;
+    if (!paidById || amount <= 0) return;
+
+    if (exp.splitType === 'custom' && exp.customSplits && typeof exp.customSplits === 'object') {
+      Object.keys(exp.customSplits).forEach((mKey) => {
+        const debtorId = resolveMemberId(mKey);
+        const share = Math.round((Number(exp.customSplits![mKey]) || 0) * 100) / 100;
+        if (debtorId && debtorId !== paidById && pairwiseDebt[debtorId] && pairwiseDebt[debtorId][paidById] !== undefined) {
+          pairwiseDebt[debtorId][paidById] = Math.round((pairwiseDebt[debtorId][paidById] + share) * 100) / 100;
+        }
+      });
+    } else {
+      const splitAmongInput = Array.isArray(exp.splitAmong) && exp.splitAmong.length > 0
+        ? exp.splitAmong
+        : approvedMembers.map((m) => m.id);
+
+      const validSplitIds: string[] = [];
+      splitAmongInput.forEach((key) => {
+        const id = resolveMemberId(key);
+        if (id && !validSplitIds.includes(id)) {
+          validSplitIds.push(id);
+        }
+      });
+
+      const effectiveSplit = validSplitIds.length > 0 ? validSplitIds : approvedMembers.map((m) => m.id);
+      if (effectiveSplit.length > 0) {
+        const share = Math.round((amount / effectiveSplit.length) * 100) / 100;
+        effectiveSplit.forEach((debtorId) => {
+          if (debtorId !== paidById && pairwiseDebt[debtorId] && pairwiseDebt[debtorId][paidById] !== undefined) {
+            pairwiseDebt[debtorId][paidById] = Math.round((pairwiseDebt[debtorId][paidById] + share) * 100) / 100;
+          }
+        });
+      }
+    }
+  });
+
+  // Apply completed settlement payments history directly between pairs
+  const settlementHistory = Array.isArray(room.settlementHistory) ? room.settlementHistory : [];
+  settlementHistory.forEach((payment) => {
+    if (payment && payment.status === 'PAID') {
+      const fromId = resolveMemberId(payment.fromId) || resolveMemberId(payment.fromName);
+      const toId = resolveMemberId(payment.toId) || resolveMemberId(payment.toName);
+      const amount = Math.round((Number(payment.amount) || 0) * 100) / 100;
+
+      if (fromId && toId && pairwiseDebt[fromId] && pairwiseDebt[fromId][toId] !== undefined) {
+        pairwiseDebt[fromId][toId] = Math.round((pairwiseDebt[fromId][toId] - amount) * 100) / 100;
+      }
+    }
+  });
+
+  // Net out pairwise debts between each pair (A, B)
+  const settlements: Settlement[] = [];
+  const memberList = approvedMembers;
+
+  for (let a = 0; a < memberList.length; a++) {
+    for (let b = a + 1; b < memberList.length; b++) {
+      const idA = memberList[a].id;
+      const idB = memberList[b].id;
+      const debtAtoB = pairwiseDebt[idA]?.[idB] || 0;
+      const debtBtoA = pairwiseDebt[idB]?.[idA] || 0;
+
+      const net = Math.round((debtAtoB - debtBtoA) * 100) / 100;
+
+      if (net > 0.01) {
+        settlements.push({
+          fromId: idA,
+          fromName: memberList[a].name,
+          toId: idB,
+          toName: memberList[b].name,
+          amount: net,
+        });
+      } else if (net < -0.01) {
+        settlements.push({
+          fromId: idB,
+          fromName: memberList[b].name,
+          toId: idA,
+          toName: memberList[a].name,
+          amount: Math.abs(net),
+        });
+      }
+    }
+  }
+
+  return settlements;
+}
+
+// 2. Minimum Cash Flow Settlement Algorithm (Optimized Global Transfers)
+export function calculateSimplifiedSettlements(room: Room | null): Settlement[] {
   if (!room) return [];
   const members = Array.isArray(room.members) ? room.members : [];
   const expenses = Array.isArray(room.expenses) ? room.expenses : [];
@@ -670,5 +796,13 @@ export function calculateSettlements(room: Room | null): Settlement[] {
   }
 
   return settlements;
+}
+
+// Master settlement calculator: defaults to 'direct' pairwise settlements (no third-party debt redirection)
+export function calculateSettlements(room: Room | null, mode: 'direct' | 'simplified' = 'direct'): Settlement[] {
+  if (mode === 'simplified') {
+    return calculateSimplifiedSettlements(room);
+  }
+  return calculateDirectSettlements(room);
 }
 

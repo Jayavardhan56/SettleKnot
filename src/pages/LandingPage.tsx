@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Sparkles, CheckCircle2, ShieldCheck, Calculator, Download, QrCode, Compass } from 'lucide-react';
+import { ArrowRight, Sparkles, CheckCircle2, ShieldCheck, Calculator, Download, QrCode, Compass, BookOpen } from 'lucide-react';
 import { navigateTo } from '../lib/router';
 import { User } from '../types';
 
@@ -42,7 +42,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ currentUser, onOpenAut
             <a href="#about" className="hover:text-orange-600 transition-colors">About</a>
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <a
+              href="/SettleKnot_User_Guide.pdf"
+              download="SettleKnot_User_Guide.pdf"
+              className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-tech font-bold flex items-center gap-1.5 transition-all shadow-2xs"
+              title="Download SettleKnot User Guide (PDF)"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">User Guide PDF</span>
+              <span className="sm:hidden">Guide</span>
+            </a>
+
             {currentUser ? (
               <button
                 onClick={() => navigateTo('dashboard')}

@@ -35,6 +35,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const [splitType, setSplitType] = useState<SplitType>('equal');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [customSplits, setCustomSplits] = useState<Record<string, string>>({});
+  const [selectedPayerId, setSelectedPayerId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
@@ -54,6 +55,12 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       setNotes('');
       setCustomSplits({});
       setIsPersonal(false);
+
+      // Default payer: currentUser if in approved members, or first approved member, or host
+      const defaultPayer = currentUser?.id && approvedMembers.some((m) => m.id === currentUser.id)
+        ? currentUser.id
+        : (approvedMembers[0]?.id || currentUser?.id || room.hostId || '');
+      setSelectedPayerId(defaultPayer);
     }
   }, [isOpen, room?.code]);
 
@@ -61,9 +68,28 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
 
   const handleSelectEqualSplit = () => {
     setSplitType('equal');
-    // Auto-select ALL approved members immediately on equal split
-    const allApprovedIds = approvedMembers.map((m) => m.id);
-    setSelectedMembers(allApprovedIds);
+    if (selectedMembers.length === 0) {
+      setSelectedMembers(approvedMembers.map((m) => m.id));
+    }
+    setError('');
+  };
+
+  const toggleMemberForEqual = (id: string) => {
+    if (selectedMembers.includes(id)) {
+      if (selectedMembers.length <= 1) {
+        setError('At least one member must participate in the split.');
+        return;
+      }
+      setSelectedMembers(selectedMembers.filter((mId) => mId !== id));
+      setError('');
+    } else {
+      setSelectedMembers([...selectedMembers, id]);
+      setError('');
+    }
+  };
+
+  const selectAllEqualMembers = () => {
+    setSelectedMembers(approvedMembers.map((m) => m.id));
     setError('');
   };
 
@@ -106,17 +132,19 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       return;
     }
 
-    // Payer is strictly and exclusively the current authenticated user
-    const payerId = currentUser?.id || room.hostId || (room.members[0] ? room.members[0].id : '');
-    const payerName = currentUser?.name || 'You';
+    // Resolve Payer: either selected from dropdown or active user
+    const resolvedPayerId = selectedPayerId || currentUser?.id || room.hostId || (approvedMembers[0] ? approvedMembers[0].id : '');
+    const payerMember = approvedMembers.find((m) => m.id === resolvedPayerId) ||
+      (currentUser?.id === resolvedPayerId ? currentUser : null);
+    const resolvedPayerName = payerMember?.name || (resolvedPayerId === currentUser?.id ? currentUser?.name || 'You' : 'Member');
 
     if (!isPersonal) {
-      if (splitType === 'custom') {
-        if (selectedMembers.length === 0) {
-          setError('Please select at least one member to split among.');
-          return;
-        }
+      if (selectedMembers.length === 0) {
+        setError('Please select at least one member to split among.');
+        return;
+      }
 
+      if (splitType === 'custom') {
         let sumCustom = 0;
         const formattedSplits: Record<string, number> = {};
         for (const mId of selectedMembers) {
@@ -126,7 +154,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             return;
           }
           sumCustom += val;
-          formattedSplits[mId] = val;
+          formattedSplits[mId] = Math.round(val * 100) / 100;
         }
 
         if (Math.abs(sumCustom - numAmount) > 0.05) {
@@ -142,8 +170,8 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
           title: title.trim(),
           amount: numAmount,
           category,
-          paidBy: payerId,
-          paidByName: payerName,
+          paidBy: resolvedPayerId,
+          paidByName: resolvedPayerName,
           isPersonal: false,
           splitType: 'custom',
           splitAmong: selectedMembers,
@@ -151,17 +179,16 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
           notes: notes.trim(),
         });
       } else {
-        // Equal split: automatically split among all approved room members
-        const allApprovedIds = approvedMembers.map((m) => m.id);
+        // Equal split among selected participating members
         onAddExpense({
           title: title.trim(),
           amount: numAmount,
           category,
-          paidBy: payerId,
-          paidByName: payerName,
+          paidBy: resolvedPayerId,
+          paidByName: resolvedPayerName,
           isPersonal: false,
           splitType: 'equal',
-          splitAmong: allApprovedIds,
+          splitAmong: selectedMembers,
           customSplits: null,
           notes: notes.trim(),
         });
@@ -172,11 +199,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
         title: title.trim(),
         amount: numAmount,
         category,
-        paidBy: payerId,
-        paidByName: payerName,
+        paidBy: currentUser?.id || resolvedPayerId,
+        paidByName: currentUser?.name || resolvedPayerName,
         isPersonal: true,
         splitType: 'personal',
-        splitAmong: [payerId],
+        splitAmong: [currentUser?.id || resolvedPayerId],
         customSplits: null,
         notes: notes.trim(),
       });
@@ -190,8 +217,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     onClose();
   };
 
+  const currentSelectedPayer = approvedMembers.find((m) => m.id === selectedPayerId) ||
+    (currentUser?.id === selectedPayerId ? currentUser : null);
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn font-sans">
+    <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn font-sans">
       <div className="glass-panel-light max-w-lg w-full rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-5 bg-gradient-to-r from-orange-600 to-amber-600 text-white flex items-center justify-between shadow-xs">
@@ -260,29 +290,37 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             )}
           </div>
 
-          {/* Paid By: Locked by default to the active user (no option to pick other users) */}
+          {/* Paid By: Select which room member actually paid */}
           {!isPersonal && (
             <div>
-              <label className="block text-xs font-tech font-bold text-slate-700 uppercase mb-1">
-                Paid By (Payer)
-              </label>
-              <div className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 flex items-center justify-between shadow-2xs">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-xl shrink-0">{currentUser?.avatar || '👤'}</span>
-                  <div className="min-w-0">
-                    <h4 className="font-tech font-bold text-xs sm:text-sm text-slate-900 leading-tight truncate">
-                      {currentUser?.name || 'You'}
-                    </h4>
-                    <p className="text-[10px] sm:text-[11px] text-emerald-700 font-medium">
-                      You are paying for this expense
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-tech font-bold uppercase bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-300 flex items-center gap-1 shrink-0">
-                  <Check className="w-3 h-3 text-emerald-700" />
-                  <span>Payer (You)</span>
-                </span>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-tech font-bold text-slate-700 uppercase">
+                  Paid By (Who paid for this?)
+                </label>
+                {selectedPayerId && selectedPayerId === currentUser?.id && (
+                  <span className="text-[10px] font-tech font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    You paid ✓
+                  </span>
+                )}
               </div>
+              <div className="relative">
+                <select
+                  value={selectedPayerId}
+                  onChange={(e) => setSelectedPayerId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-tech font-bold text-slate-900 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer shadow-2xs"
+                >
+                  {approvedMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.avatar || '👤'} {m.name} {m.id === currentUser?.id ? '(You)' : ''} {m.id === room.hostId ? '👑 (Host)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {currentSelectedPayer && (
+                <p className="text-[11px] text-slate-500 font-medium mt-1">
+                  💰 Credit assigned to <strong>{currentSelectedPayer.name}</strong>. Participating members will owe them.
+                </p>
+              )}
             </div>
           )}
 
@@ -367,33 +405,51 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
                 </div>
               </div>
 
-              {/* Equal Split: All Members are automatically selected */}
+              {/* Equal Split: Toggle participating members */}
               {splitType === 'equal' && (
-                <div className="p-3.5 rounded-2xl bg-orange-50 border border-orange-200 space-y-2">
+                <div className="p-3.5 rounded-2xl bg-orange-50 border border-orange-200 space-y-2.5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-base">👥</span>
                       <span className="font-tech font-bold text-xs text-orange-950">
-                        All {approvedMembers.length} Members Auto-Selected (Equal Share)
+                        Splitting equally among {selectedMembers.length} member{selectedMembers.length !== 1 ? 's' : ''}
                       </span>
                     </div>
-                    {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 && (
-                      <span className="font-digits font-black text-xs text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md border border-orange-200 self-start sm:self-auto">
-                        ₹{(parseFloat(amount) / (approvedMembers.length || 1)).toFixed(2)} / member
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 && selectedMembers.length > 0 && (
+                        <span className="font-digits font-black text-xs text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md border border-orange-200">
+                          ₹{(parseFloat(amount) / selectedMembers.length).toFixed(2)} / member
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={selectAllEqualMembers}
+                        className="text-[10px] font-tech font-bold text-orange-800 bg-white hover:bg-orange-100 px-2 py-0.5 rounded-md border border-orange-300 transition-colors cursor-pointer"
+                      >
+                        Select All
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5 pt-1 border-t border-orange-200/60">
-                    {approvedMembers.map((m) => (
-                      <span
-                        key={m.id}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-orange-200 text-[11px] font-tech font-bold text-slate-800 flex items-center gap-1 shadow-2xs"
-                      >
-                        <span>{m.avatar}</span>
-                        <span>{m.name}</span>
-                        <Check className="w-3 h-3 text-emerald-600" />
-                      </span>
-                    ))}
+                    {approvedMembers.map((m) => {
+                      const isSelected = selectedMembers.includes(m.id);
+                      return (
+                        <button
+                          type="button"
+                          key={m.id}
+                          onClick={() => toggleMemberForEqual(m.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-tech font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-orange-600 text-white border-orange-600 shadow-2xs'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300'
+                          }`}
+                        >
+                          <span>{m.avatar}</span>
+                          <span>{m.name}</span>
+                          {isSelected ? <Check className="w-3 h-3 text-white" /> : <span className="w-3 h-3 block opacity-30">+</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

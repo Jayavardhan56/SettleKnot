@@ -19,16 +19,128 @@
       "isAdmin": false
     },
     {
-      "id": "usr_1790244743670_egr3n",
-      "name": "T2",
-      "email": "t2@gmail.com",
-      "password": "t2",
-      "avatar": "🐨",
-      "createdAt": "2026-09-24T10:12:23.670Z",
+      "id": "usr_guide_demo",
+      "name": "Alex Johnson",
+      "email": "alex@example.com",
+      "password": "password123",
+      "avatar": "🦊",
+      "createdAt": "2026-10-10T12:00:00.000Z",
+      "isAdmin": false
+    },
+    {
+      "id": "usr_member_sam",
+      "name": "Sam Rivera",
+      "email": "sam@example.com",
+      "password": "password123",
+      "avatar": "🐱",
+      "createdAt": "2026-10-10T12:00:00.000Z",
+      "isAdmin": false
+    },
+    {
+      "id": "usr_member_priya",
+      "name": "Priya Sharma",
+      "email": "priya@example.com",
+      "password": "password123",
+      "avatar": "🦁",
+      "createdAt": "2026-10-10T12:00:00.000Z",
       "isAdmin": false
     }
   ],
   "rooms": [
+    {
+      "id": "room-goa-2026",
+      "code": "GOA26X",
+      "name": "Goa Reunion 🏖️",
+      "currency": "₹",
+      "hostId": "usr_guide_demo",
+      "createdAt": "2026-10-10T12:00:00.000Z",
+      "joinRequests": [],
+      "members": [
+        {
+          "id": "usr_guide_demo",
+          "name": "Alex Johnson (You)",
+          "avatar": "🦊",
+          "isHost": true,
+          "status": "approved"
+        },
+        {
+          "id": "usr_member_sam",
+          "name": "Sam Rivera",
+          "avatar": "🐱",
+          "isHost": false,
+          "status": "approved"
+        },
+        {
+          "id": "usr_member_priya",
+          "name": "Priya Sharma",
+          "avatar": "🦁",
+          "isHost": false,
+          "status": "approved"
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-1",
+          "title": "Beach Villa Resort (2 Nights)",
+          "amount": 12000,
+          "category": "stay",
+          "paidBy": "usr_guide_demo",
+          "paidByName": "Alex Johnson (You)",
+          "isPersonal": false,
+          "splitType": "equal",
+          "splitAmong": ["usr_guide_demo", "usr_member_sam", "usr_member_priya"],
+          "notes": "Booked on MakeMyTrip",
+          "dateFormatted": "10 Oct 2026",
+          "timeFormatted": "02:30 PM",
+          "timestamp": "2026-10-10T09:00:00.000Z"
+        },
+        {
+          "id": "exp-2",
+          "title": "Seafood Shack Dinner",
+          "amount": 3600,
+          "category": "food",
+          "paidBy": "usr_member_sam",
+          "paidByName": "Sam Rivera",
+          "isPersonal": false,
+          "splitType": "equal",
+          "splitAmong": ["usr_guide_demo", "usr_member_sam", "usr_member_priya"],
+          "notes": "Dinner with drinks",
+          "dateFormatted": "10 Oct 2026",
+          "timeFormatted": "08:45 PM",
+          "timestamp": "2026-10-10T15:15:00.000Z"
+        },
+        {
+          "id": "exp-3",
+          "title": "Sunset Cruise Tickets",
+          "amount": 4500,
+          "category": "activities",
+          "paidBy": "usr_member_priya",
+          "paidByName": "Priya Sharma",
+          "isPersonal": false,
+          "splitType": "equal",
+          "splitAmong": ["usr_guide_demo", "usr_member_sam", "usr_member_priya"],
+          "notes": "Mandovi River Cruise",
+          "dateFormatted": "11 Oct 2026",
+          "timeFormatted": "05:00 PM",
+          "timestamp": "2026-10-11T11:30:00.000Z"
+        }
+      ],
+      "userRejections": {},
+      "settlementHistory": [
+        {
+          "id": "pay_hist_1",
+          "fromId": "usr_member_sam",
+          "fromName": "Sam Rivera",
+          "toId": "usr_guide_demo",
+          "toName": "Alex Johnson (You)",
+          "amount": 2500,
+          "dateFormatted": "11 Oct 2026",
+          "timeFormatted": "10:15 AM",
+          "timestamp": "2026-10-11T04:45:00.000Z",
+          "status": "PENDING"
+        }
+      ]
+    },
     {
       "id": "room-1790253747443",
       "code": "C2KTSM",

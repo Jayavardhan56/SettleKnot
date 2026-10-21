@@ -1,6 +1,6 @@
-import React from 'react';
-import { Crown, Trash2, LogOut, UserMinus, UserCheck, Check } from 'lucide-react';
-import { removeMemberFromRoom, leaveRoom, deleteRoom, syncServerRooms, setActiveRoomCode, approveJoinRequest, rejectJoinRequest } from '../lib/store';
+import React, { useState } from 'react';
+import { Crown, Trash2, LogOut, UserMinus, UserCheck, Check, UserPlus, X } from 'lucide-react';
+import { removeMemberFromRoom, leaveRoom, deleteRoom, syncServerRooms, setActiveRoomCode, approveJoinRequest, rejectJoinRequest, addMemberToRoom } from '../lib/store';
 import { navigateTo } from '../lib/router';
 import { Room, User } from '../types';
 
@@ -16,6 +16,35 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({ room, currentUser, s
   const isHost = currentUser?.id === room.hostId;
   const approvedMembers = room.members.filter((m) => m && m.status === 'approved');
   const pendingRequests = isHost && Array.isArray(room.joinRequests) ? room.joinRequests.filter((r) => r && r.status === 'pending') : [];
+
+  const [isAddingMember, setIsAddingMember] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberAvatar, setNewMemberAvatar] = useState('👤');
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState('');
+
+  const AVATARS = ['👤', '🦊', '🐼', '🦁', '🐻', '🐯', '🐨', '🦄', '🐲', '🐙', '🐱', '🐶'];
+
+  const handleAddMemberSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMemberName.trim()) {
+      setAddError('Please enter a member name');
+      return;
+    }
+    setAddLoading(true);
+    setAddError('');
+    try {
+      await addMemberToRoom(room.code, newMemberName.trim(), newMemberAvatar);
+      const updatedRooms = await syncServerRooms();
+      if (setRooms) setRooms(updatedRooms);
+      setNewMemberName('');
+      setIsAddingMember(false);
+    } catch (err: any) {
+      setAddError(err.message || 'Failed to add member');
+    } finally {
+      setAddLoading(false);
+    }
+  };
 
   const handleApprove = async (reqId: string) => {
     await approveJoinRequest(room.code, reqId);
@@ -116,6 +145,17 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({ room, currentUser, s
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Host Add Member Button */}
+          {isHost && (
+            <button
+              onClick={() => setIsAddingMember(!isAddingMember)}
+              className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-tech font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{isAddingMember ? 'Cancel' : 'Add Member ➕'}</span>
+            </button>
+          )}
+
           {/* Member Leave Room Button (For Non-Host Approved Members) */}
           {!isHost && (
             <button
@@ -139,6 +179,76 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({ room, currentUser, s
           )}
         </div>
       </div>
+
+      {/* Host Inline Add Member Form */}
+      {isHost && isAddingMember && (
+        <form onSubmit={handleAddMemberSubmit} className="p-4 rounded-2xl bg-orange-50 border border-orange-200 space-y-3 animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <h4 className="font-tech font-bold text-xs text-orange-950 uppercase flex items-center gap-1.5">
+              <UserPlus className="w-4 h-4 text-orange-600" />
+              <span>Add Member Directly to Room</span>
+            </h4>
+            <button
+              type="button"
+              onClick={() => setIsAddingMember(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {addError && (
+            <div className="text-xs text-rose-600 font-medium bg-rose-50 p-2 rounded-lg border border-rose-200">
+              {addError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+            <div className="sm:col-span-6">
+              <label className="block text-[11px] font-tech font-bold text-slate-700 uppercase mb-1">
+                Member Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Alex, Sam, A2, Priya"
+                value={newMemberName}
+                onChange={(e) => setNewMemberName(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-tech font-bold text-slate-900 focus:outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div className="sm:col-span-4">
+              <label className="block text-[11px] font-tech font-bold text-slate-700 uppercase mb-1">
+                Avatar Emoji
+              </label>
+              <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-300 overflow-x-auto">
+                {AVATARS.slice(0, 7).map((av) => (
+                  <button
+                    type="button"
+                    key={av}
+                    onClick={() => setNewMemberAvatar(av)}
+                    className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-all cursor-pointer ${
+                      newMemberAvatar === av ? 'bg-orange-100 ring-2 ring-orange-500 scale-105' : 'hover:bg-slate-100'
+                    }`}
+                  >
+                    {av}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                disabled={addLoading}
+                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-tech font-bold text-xs cursor-pointer shadow-xs transition-all flex items-center justify-center gap-1"
+              >
+                <span>{addLoading ? 'Adding...' : 'Add ➕'}</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
 
       {/* Member Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">

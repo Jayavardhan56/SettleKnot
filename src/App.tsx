@@ -191,8 +191,8 @@ export default function App() {
     if (!currentRoom) return;
     const finalData = {
       ...expenseData,
-      paidBy: currentUser?.id || expenseData.paidBy || currentRoom.hostId,
-      paidByName: currentUser?.name || expenseData.paidByName || 'You',
+      paidBy: expenseData.paidBy || currentUser?.id || currentRoom.hostId,
+      paidByName: expenseData.paidByName || currentUser?.name || 'You',
     };
     await addExpense(currentRoom.code, finalData);
     syncServerRooms().then(setRooms);

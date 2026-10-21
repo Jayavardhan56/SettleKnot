@@ -210,15 +210,15 @@ export function generateTripPDF(room: Room | null): void {
   // 4A. Member Net Financial Balances Table
   const memberBalances = approvedMembers.map((m) => {
     const totalPaid = groupExpenses
-      .filter((e) => e.paidBy === m.id)
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
+      .filter((e) => e.paidBy === m.id || (e.paidByName && m.name && e.paidByName.toLowerCase() === m.name.toLowerCase()))
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
     const receive = settlements
-      .filter((s) => s.toId === m.id)
+      .filter((s) => s.toId === m.id || (m.name && s.toName.toLowerCase() === m.name.toLowerCase()))
       .reduce((sum, s) => sum + s.amount, 0);
 
     const pay = settlements
-      .filter((s) => s.fromId === m.id)
+      .filter((s) => s.fromId === m.id || (m.name && s.fromName.toLowerCase() === m.name.toLowerCase()))
       .reduce((sum, s) => sum + s.amount, 0);
 
     const net = receive - pay;

@@ -26,6 +26,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'settlements' | 'expenses' | 'members'>('settlements');
   const [expenseFilter, setExpenseFilter] = useState<'all' | 'group' | 'personal'>('all');
+  const [settlementMode, setSettlementMode] = useState<'direct' | 'simplified'>('direct');
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -47,14 +48,15 @@ export const RoomPage: React.FC<RoomPageProps> = ({
       (exp.paidBy === currentUser?.id ||
         (exp.paidByName && currentUser?.name && exp.paidByName.toLowerCase() === currentUser.name.toLowerCase()));
 
-    if (!isPayerOfExpense) {
-      alert('Permission Denied: Only the person who logged this expense has the option to delete it.');
+    if (!isPayerOfExpense && !isHost) {
+      alert('Permission Denied: Only the person who logged this expense or the Room Host can delete it.');
       return;
     }
 
     if (confirm('Are you sure you want to delete this expense item?')) {
       await deleteExpense(room.code, expenseId, currentUser?.id);
-      syncServerRooms().then(setRooms);
+      const updatedRooms = await syncServerRooms();
+      if (setRooms) setRooms(updatedRooms);
     }
   };
 
@@ -83,13 +85,21 @@ export const RoomPage: React.FC<RoomPageProps> = ({
     }
   };
 
+  const isCurrentUser = (id: string, name?: string) => {
+    if (!currentUser) return false;
+    return (
+      (id && id === currentUser.id) ||
+      (name && currentUser.name && name.toLowerCase() === currentUser.name.toLowerCase()) ||
+      (id && currentUser.name && id.toLowerCase() === currentUser.name.toLowerCase())
+    );
+  };
+
   const getClaimForSettlement = (s: Settlement) => {
     const history = room.settlementHistory || [];
     return history.find(
       (p) =>
         ((p.fromId === s.fromId && p.toId === s.toId) ||
          (p.fromName.toLowerCase() === s.fromName.toLowerCase() && p.toName.toLowerCase() === s.toName.toLowerCase())) &&
-        Math.abs(p.amount - s.amount) < 0.01 &&
         (p.status === 'PENDING' || p.status === 'DECLINED')
     );
   };
@@ -241,17 +251,19 @@ export const RoomPage: React.FC<RoomPageProps> = ({
   }
 
   // Approved Member Calculations
-  const settlements = calculateSettlements(room);
+  const directSettlements = calculateSettlements(room, 'direct');
+  const simplifiedSettlements = calculateSettlements(room, 'simplified');
+  const settlements = settlementMode === 'direct' ? directSettlements : simplifiedSettlements;
   const approvedMembers = room.members ? room.members.filter((m) => m.status === 'approved') : [];
 
   // All group expenses
   const groupExpenses = room.expenses ? room.expenses.filter((e) => !e.isPersonal) : [];
-  const totalTripSpend = groupExpenses.reduce((acc, e) => acc + e.amount, 0);
+  const totalTripSpend = groupExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
   const avgSpendPerMember = approvedMembers.length > 0 ? totalTripSpend / approvedMembers.length : 0;
 
   // Expenses visible to current user (Group + My Personal)
   const visibleExpenses = room.expenses
-    ? room.expenses.filter((e) => !e.isPersonal || (e.isPersonal && e.paidBy === currentUser?.id))
+    ? room.expenses.filter((e) => !e.isPersonal || (e.isPersonal && (e.paidBy === currentUser?.id || e.paidByName === currentUser?.name)))
     : [];
 
   const filteredExpenses = visibleExpenses.filter((e) => {
@@ -261,12 +273,12 @@ export const RoomPage: React.FC<RoomPageProps> = ({
   });
 
   // Current user personalized settlements:
-  const receiveList = settlements.filter((s) => s.toId === currentUser?.id);
-  const payList = settlements.filter((s) => s.fromId === currentUser?.id);
+  const receiveList = settlements.filter((s) => isCurrentUser(s.toId, s.toName));
+  const payList = settlements.filter((s) => isCurrentUser(s.fromId, s.fromName));
 
-  const totalReceive = receiveList.reduce((acc, s) => acc + s.amount, 0);
-  const totalPay = payList.reduce((acc, s) => acc + s.amount, 0);
-  const netUserPosition = totalReceive - totalPay;
+  const totalReceive = Math.round(receiveList.reduce((acc, s) => acc + s.amount, 0) * 100) / 100;
+  const totalPay = Math.round(payList.reduce((acc, s) => acc + s.amount, 0) * 100) / 100;
+  const netUserPosition = Math.round((totalReceive - totalPay) * 100) / 100;
 
   const pendingRequests = room.joinRequests ? room.joinRequests.filter((r) => r && r.status === 'pending') : [];
 
@@ -510,6 +522,48 @@ export const RoomPage: React.FC<RoomPageProps> = ({
       {/* Tab 1: Personalized Debt Summary & Transfers */}
       {activeTab === 'settlements' && (
         <div className="space-y-6 animate-fadeIn">
+          {/* Settlement Algorithm Mode Switcher */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-tech font-bold text-sm text-slate-900">Settlement Method:</span>
+                <span className="text-xs font-mono font-bold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-md border border-orange-200">
+                  {settlementMode === 'direct' ? '🎯 Direct Debts' : '⚡ Simplified Transfers'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium mt-1">
+                {settlementMode === 'direct'
+                  ? '🎯 Direct Pairwise: Settle directly with the person who paid for you (e.g. if A2 paid for A1, A1 pays A2 directly).'
+                  : '⚡ Simplified Cash Flow: Multi-person debts are merged into fewer transactions across the group.'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs shrink-0 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setSettlementMode('direct')}
+                className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-tech font-bold transition-all cursor-pointer ${
+                  settlementMode === 'direct'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🎯 Direct Debts
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettlementMode('simplified')}
+                className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-tech font-bold transition-all cursor-pointer ${
+                  settlementMode === 'simplified'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ⚡ Simplified
+              </button>
+            </div>
+          </div>
+
           {/* Personalized User Net Balance Card */}
           <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-md space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
@@ -519,7 +573,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                   Your Personal Debt Summary ({currentUser?.name || 'You'})
                 </h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  Clear overview of how much money you should collect or pay to other members
+                  Clear overview of how much money you should collect or pay to other members ({settlementMode === 'direct' ? 'Direct Debts' : 'Simplified'})
                 </p>
               </div>
 
@@ -565,13 +619,13 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                         key={idx}
                         className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs"
                       >
-                        <div className="flex items-center justify-between sm:justify-start gap-2">
-                          <span className="font-tech font-bold text-xs text-slate-900">{s.fromName}</span>
-                          <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                        <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+                          <span className="font-tech font-bold text-xs text-slate-900 truncate">{s.fromName}</span>
+                          <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 shrink-0">
                             must pay you
                           </span>
                         </div>
-                        <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1.5 sm:pt-0 border-t sm:border-0 border-emerald-100/60">
+                        <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1.5 sm:pt-0 border-t sm:border-0 border-emerald-100/60 shrink-0">
                           <span className="font-digits font-black text-sm text-emerald-600 shrink-0">
                             ₹{s.amount.toFixed(2)}
                           </span>
@@ -607,13 +661,13 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                         key={idx}
                         className="p-3 sm:p-3.5 rounded-2xl bg-white border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs"
                       >
-                        <div className="flex items-center justify-between sm:justify-start gap-2">
-                          <span className="text-[10px] text-rose-700 font-medium bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
+                        <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+                          <span className="text-[10px] text-rose-700 font-medium bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100 shrink-0">
                             You must pay
                           </span>
-                          <span className="font-tech font-bold text-xs text-slate-900">{s.toName}</span>
+                          <span className="font-tech font-bold text-xs text-slate-900 truncate">{s.toName}</span>
                         </div>
-                        <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1.5 sm:pt-0 border-t sm:border-0 border-rose-100/60">
+                        <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1.5 sm:pt-0 border-t sm:border-0 border-rose-100/60 shrink-0">
                           <span className="font-digits font-black text-sm text-rose-600 shrink-0">
                             ₹{s.amount.toFixed(2)}
                           </span>
@@ -635,10 +689,12 @@ export const RoomPage: React.FC<RoomPageProps> = ({
               <div>
                 <h3 className="font-tech font-bold text-lg text-slate-900 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
-                  Full Room Settlement Plan (Min Cash Flow)
+                  Full Room Settlement Plan ({settlementMode === 'direct' ? 'Direct Pairwise' : 'Min Cash Flow'})
                 </h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  Complete minimum transaction transfers to settle all trip debts
+                  {settlementMode === 'direct'
+                    ? 'Direct person-to-person transfers based on who paid for whom'
+                    : 'Optimized minimum transaction transfers to settle all trip debts across the group'}
                 </p>
               </div>
             </div>
@@ -919,12 +975,13 @@ export const RoomPage: React.FC<RoomPageProps> = ({
                         ₹{exp.amount.toFixed(2)}
                       </span>
 
-                      {/* Only the person who logged that expense can have the option to delete it */}
-                      {(exp.paidBy === currentUser?.id ||
+                      {/* Only the person who logged that expense or the host can delete it */}
+                      {(isHost ||
+                        exp.paidBy === currentUser?.id ||
                         (exp.paidByName && currentUser?.name && exp.paidByName.toLowerCase() === currentUser.name.toLowerCase())) && (
                         <button
                           onClick={() => handleDeleteExpense(exp.id)}
-                          title="Delete Expense (Only Creator Allowed)"
+                          title="Delete Expense (Creator or Host Allowed)"
                           className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-all cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
